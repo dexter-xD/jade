@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(js_runtime)
+project(jade)
 
 set(CMAKE_C_STANDARD 99)
 
@@ -13,14 +13,14 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/include
 )
 
-add_executable(js_runtime
+add_executable(jade
     src/jsc_engine.c
     src/uv_event_loop.c
     src/system_apis.c
     src/main.c
 )
 
-target_link_libraries(js_runtime
+target_link_libraries(jade
     ${WEBKIT_LIBRARIES}
     ${LIBUV_LIBRARIES}
 )
