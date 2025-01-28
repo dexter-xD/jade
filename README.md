@@ -223,3 +223,12 @@ make clean && make
 ---
 
 **Jade** is maintained by [dexter](https://github.com/dexter-xD) as an educational resource for understanding low-level runtime development. Not affiliated with Node.js, Bun, or WebKit projects.
+
+---
+
+## Support
+
+If you find this project helpful, consider buying me a coffee! ☕
+
+[![Buy Me a Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://buymeacoffee.com/trish07)
+
