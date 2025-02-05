@@ -1,5 +1,5 @@
-console.log("This is a log message.");
-console.warn("This is a warning message!");
-console.info("This is an info message.");
-console.debug("This is a debug message.");
-console.error("ERROR")
+console.log("Multiple", "Arguments", "Test", 123, { key: "value" });
+console.warn("Warning:", "Low", "Memory");
+console.info("Info:", "Version", 0.1);
+console.debug("Debug:", "State", { data: 42 });
+console.error("Error:", "Failed to load", "User data", { errorCode: 404 });

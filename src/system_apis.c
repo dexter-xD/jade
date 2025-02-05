@@ -35,100 +35,135 @@
 #include <JavaScriptCore/JavaScript.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "runtime.h"
 
+// ================== Helper Function ================== //
+
 /**
- * console.log implementation
- * @param args[0]  Message to log
+ * Converts multiple JS values to a concatenated string
+ * @param ctx       JS context
+ * @param argc      Number of arguments
+ * @param args      Array of JS values
+ * @param exception Exception object (if any)
+ * @return          Concatenated string (must be freed by caller)
  */
-static JSValueRef console_log(JSContextRef ctx, JSObjectRef function, 
-                             JSObjectRef thisObject, size_t argc, 
-                             const JSValueRef args[], JSValueRef* exception) {
-    // Convert JS string to C string
-    JSStringRef message = JSValueToStringCopy(ctx, args[0], exception);
-    size_t len = JSStringGetMaximumUTF8CStringSize(message);
-    char* cmsg = malloc(len);
-    JSStringGetUTF8CString(message, cmsg, len);
-    
-    // Print to stdout
-    printf("LOG: %s\n", cmsg);
-    
-    // Cleanup
-    free(cmsg);
-    JSStringRelease(message);
+static char* js_values_to_string(JSContextRef ctx, size_t argc, const JSValueRef args[], JSValueRef* exception) {
+    if (argc == 0) return strdup("");  // Handle no arguments
+
+    // Temporary array to store C strings
+    char** c_strs = malloc(argc * sizeof(char*));
+    size_t total_len = 0;
+
+    // First pass: convert all JS values to C strings
+    for (size_t i = 0; i < argc; i++) {
+        JSStringRef js_str = JSValueToStringCopy(ctx, args[i], exception);
+        if (*exception) {
+            // Cleanup on error
+            for (size_t j = 0; j < i; j++) free(c_strs[j]);
+            free(c_strs);
+            return NULL;
+        }
+
+        size_t max_len = JSStringGetMaximumUTF8CStringSize(js_str);
+        c_strs[i] = malloc(max_len);
+        JSStringGetUTF8CString(js_str, c_strs[i], max_len);
+        JSStringRelease(js_str);
+
+        total_len += strlen(c_strs[i]) + 1;  // +1 for space or null terminator
+    }
+
+    // Allocate final string buffer
+    char* result = malloc(total_len);
+    result[0] = '\0';
+
+    // Second pass: concatenate all strings
+    for (size_t i = 0; i < argc; i++) {
+        strcat(result, c_strs[i]);
+        if (i < argc - 1) strcat(result, " ");
+        free(c_strs[i]);  // Free individual strings
+    }
+
+    free(c_strs);
+    return result;
+}
+
+
+// ================== Console API Implementations ================== //
+
+/**
+ * Generic console output function
+ * @param prefix    Prefix for the log (e.g., "LOG", "WARN")
+ * @param color     ANSI color code (e.g., "\033[34m" for blue)
+ * @param ctx       JS context
+ * @param function  JS function reference
+ * @param thisObject JS `this` object
+ * @param argc      Number of arguments
+ * @param args      Array of JS values
+ * @param exception Exception object (if any)
+ */
+
+static JSValueRef console_output(const char* prefix, const char* color, JSContextRef ctx, JSObjectRef function,
+                                 JSObjectRef thisObject, size_t argc, const JSValueRef args[], JSValueRef* exception) {
+    if (argc == 0) {
+        printf("%s%s: \033[0m\n", color, prefix);  // Handle no arguments
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Convert all arguments to a single string
+    char* message = js_values_to_string(ctx, argc, args, exception);
+    printf("%s%s: %s\033[0m\n", color, prefix, message);  // Print with color and prefix
+    free(message);
+
     return JSValueMakeUndefined(ctx);
 }
 
 /**
- * console.warn - Warning output (highlighted)
- * @param args[0]  Warning message
+ * console.log - Standard log output
  */
-static JSValueRef console_warn(JSContextRef ctx, JSObjectRef function, 
+static JSValueRef console_log(JSContextRef ctx, JSObjectRef function, 
                               JSObjectRef thisObject, size_t argc, 
                               const JSValueRef args[], JSValueRef* exception) {
-    JSStringRef message = JSValueToStringCopy(ctx, args[0], exception);
-    size_t len = JSStringGetMaximumUTF8CStringSize(message);
-    char* cmsg = malloc(len);
-    JSStringGetUTF8CString(message, cmsg, len);
-    fprintf(stderr, "\033[33mWARN: %s\033[0m\n", cmsg);  // Yellow color for warnings
-    free(cmsg);
-    JSStringRelease(message);
-    return JSValueMakeUndefined(ctx);
+    return console_output("LOG", "\033[0m", ctx, function, thisObject, argc, args, exception);
+}
+
+
+/**
+ * console.warn - Warning output (highlighted)
+ */
+static JSValueRef console_warn(JSContextRef ctx, JSObjectRef function, 
+                               JSObjectRef thisObject, size_t argc, 
+                               const JSValueRef args[], JSValueRef* exception) {
+    return console_output("WARN", "\033[33m", ctx, function, thisObject, argc, args, exception);
 }
 
 /**
  * console.info - Informational output
- * @param args[0]  Info message
  */
 static JSValueRef console_info(JSContextRef ctx, JSObjectRef function, 
-                              JSObjectRef thisObject, size_t argc, 
-                              const JSValueRef args[], JSValueRef* exception) {
-    JSStringRef message = JSValueToStringCopy(ctx, args[0], exception);
-    size_t len = JSStringGetMaximumUTF8CStringSize(message);
-    char* cmsg = malloc(len);
-    JSStringGetUTF8CString(message, cmsg, len);
-    printf("\033[34mINFO: %s\033[0m\n", cmsg);  // Blue color for info
-    free(cmsg);
-    JSStringRelease(message);
-    return JSValueMakeUndefined(ctx);
+                               JSObjectRef thisObject, size_t argc, 
+                               const JSValueRef args[], JSValueRef* exception) {
+    return console_output("INFO", "\033[34m", ctx, function, thisObject, argc, args, exception);
 }
 
 /**
  * console.debug - Debug output (low priority)
- * @param args[0]  Debug message
  */
 static JSValueRef console_debug(JSContextRef ctx, JSObjectRef function, 
-                               JSObjectRef thisObject, size_t argc, 
-                               const JSValueRef args[], JSValueRef* exception) {
-    JSStringRef message = JSValueToStringCopy(ctx, args[0], exception);
-    size_t len = JSStringGetMaximumUTF8CStringSize(message);
-    char* cmsg = malloc(len);
-    JSStringGetUTF8CString(message, cmsg, len);
-    printf("\033[90mDEBUG: %s\033[0m\n", cmsg);  // Gray color for debug
-    free(cmsg);
-    JSStringRelease(message);
-    return JSValueMakeUndefined(ctx);
+                                JSObjectRef thisObject, size_t argc, 
+                                const JSValueRef args[], JSValueRef* exception) {
+    return console_output("DEBUG", "\033[90m", ctx, function, thisObject, argc, args, exception);
 }
 
 /**
- * console.error implementation
- * @param args[0]  Error message
+ * console.error - Error output (highlighted in red)
  */
 static JSValueRef console_error(JSContextRef ctx, JSObjectRef function,
                                JSObjectRef thisObject, size_t argc,
                                const JSValueRef args[], JSValueRef* exception) {
-    JSStringRef message = JSValueToStringCopy(ctx, args[0], exception);
-    size_t len = JSStringGetMaximumUTF8CStringSize(message);
-    char* cmsg = malloc(len);
-    JSStringGetUTF8CString(message, cmsg, len);
-    
-    // Print error in red color to stderr
-    fprintf(stderr, "\033[31mERROR: %s\033[0m\n", cmsg); 
-    
-    free(cmsg);
-    JSStringRelease(message);
-    return JSValueMakeUndefined(ctx);
+    return console_output("ERROR", "\033[31m", ctx, function, thisObject, argc, args, exception);
 }
+
 
 /**
  * JS-accessible setTimeout implementation
