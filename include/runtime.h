@@ -70,6 +70,9 @@ void run_event_loop();
 
 
 // ================== Timer API ================== //
+
+extern uint32_t next_timer_id;
+
 /**
  * Schedules a JS function to execute after specified delay
  * @param ctx       JS context for callback execution
@@ -78,6 +81,9 @@ void run_event_loop();
  */
 void set_timeout(JSContextRef ctx, JSObjectRef callback, uint64_t timeout);
 void clear_timeout(JSContextRef ctx, uint32_t timer_id);
+void set_interval(JSContextRef ctx, JSObjectRef callback, uint64_t interval);
+void clear_interval(JSContextRef ctx, uint32_t timer_id);
+
 
 // ================== System API Interface ================== //
 

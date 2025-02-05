@@ -254,6 +254,47 @@ static JSValueRef js_clear_timeout(JSContextRef ctx, JSObjectRef function,
 }
 
 /**
+ * setInterval - JS-accessible function
+ */
+static JSValueRef js_set_interval(JSContextRef ctx, JSObjectRef function,
+                                  JSObjectRef thisObject, size_t argc,
+                                  const JSValueRef args[], JSValueRef* exception) {
+    if (argc < 2) {
+        JSStringRef msg = JSStringCreateWithUTF8CString("setInterval requires 2 arguments");
+        *exception = JSValueMakeString(ctx, msg);
+        JSStringRelease(msg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    JSObjectRef callback = JSValueToObject(ctx, args[0], exception);
+    uint64_t interval = (uint64_t)JSValueToNumber(ctx, args[1], exception);
+    if (*exception) return JSValueMakeUndefined(ctx);
+
+    set_interval(ctx, callback, interval);
+    return JSValueMakeNumber(ctx, next_timer_id - 1);  // Return timer ID
+}
+
+/**
+ * clearInterval - JS-accessible function
+ */
+static JSValueRef js_clear_interval(JSContextRef ctx, JSObjectRef function,
+                                    JSObjectRef thisObject, size_t argc,
+                                    const JSValueRef args[], JSValueRef* exception) {
+    if (argc < 1) {
+        JSStringRef msg = JSStringCreateWithUTF8CString("clearInterval requires 1 argument");
+        *exception = JSValueMakeString(ctx, msg);
+        JSStringRelease(msg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    uint32_t timer_id = (uint32_t)JSValueToNumber(ctx, args[0], exception);
+    if (*exception) return JSValueMakeUndefined(ctx);
+
+    clear_interval(ctx, timer_id);
+    return JSValueMakeUndefined(ctx);
+}
+
+/**
  * Exposes native APIs to JS global scope
  * @param ctx  Context to enhance
  */
@@ -327,6 +368,18 @@ void expose_system_apis(JSGlobalContextRef ctx) {
     JSObjectRef clear_timeout_func = JSObjectMakeFunctionWithCallback(ctx, clear_timeout_name, js_clear_timeout);
     JSObjectSetProperty(ctx, global, clear_timeout_name, clear_timeout_func, kJSPropertyAttributeNone, NULL);
     JSStringRelease(clear_timeout_name);
+
+    // Add setInterval
+    JSStringRef set_interval_name = JSStringCreateWithUTF8CString("setInterval");
+    JSObjectRef set_interval_func = JSObjectMakeFunctionWithCallback(ctx, set_interval_name, js_set_interval);
+    JSObjectSetProperty(ctx, global, set_interval_name, set_interval_func, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(set_interval_name);
+
+    // Add clearInterval
+    JSStringRef clear_interval_name = JSStringCreateWithUTF8CString("clearInterval");
+    JSObjectRef clear_interval_func = JSObjectMakeFunctionWithCallback(ctx, clear_interval_name, js_clear_interval);
+    JSObjectSetProperty(ctx, global, clear_interval_name, clear_interval_func, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(clear_interval_name);
 
     // Create process object
     JSObjectRef process = JSObjectMake(ctx, NULL, NULL);
