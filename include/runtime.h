@@ -38,7 +38,6 @@
 #include <JavaScriptCore/JavaScript.h>
 #include <uv.h>
 
-extern uv_loop_t* loop;
 
 // ================== JavaScript Engine Interface ================== //
 
@@ -57,6 +56,8 @@ void execute_js(JSGlobalContextRef ctx, const char* script);
 
 // ================== Event Loop Interface ================== //
 
+extern uv_loop_t* loop;
+
 /**
  * Initializes libuv's default event loop
  */
@@ -67,6 +68,8 @@ void init_event_loop();
  */
 void run_event_loop();
 
+
+// ================== Timer API ================== //
 /**
  * Schedules a JS function to execute after specified delay
  * @param ctx       JS context for callback execution
@@ -74,6 +77,7 @@ void run_event_loop();
  * @param timeout   Delay in milliseconds
  */
 void set_timeout(JSContextRef ctx, JSObjectRef callback, uint64_t timeout);
+void clear_timeout(JSContextRef ctx, uint32_t timer_id);
 
 // ================== System API Interface ================== //
 

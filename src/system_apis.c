@@ -38,6 +38,7 @@
 #include <string.h>
 #include <time.h>
 #include "runtime.h"
+#include "version.h"
 
 extern int process_argc;
 extern char** process_argv;
@@ -233,11 +234,51 @@ static JSValueRef js_set_timeout(JSContextRef ctx, JSObjectRef function,
 }
 
 /**
+ * clearTimeout - JS-accessible function
+ */
+static JSValueRef js_clear_timeout(JSContextRef ctx, JSObjectRef function,
+                                   JSObjectRef thisObject, size_t argc,
+                                   const JSValueRef args[], JSValueRef* exception) {
+    if (argc < 1) {
+        JSStringRef msg = JSStringCreateWithUTF8CString("clearTimeout requires 1 argument");
+        *exception = JSValueMakeString(ctx, msg);
+        JSStringRelease(msg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    uint32_t timer_id = (uint32_t)JSValueToNumber(ctx, args[0], exception);
+    if (*exception) return JSValueMakeUndefined(ctx);
+
+    clear_timeout(ctx, timer_id);
+    return JSValueMakeUndefined(ctx);
+}
+
+/**
  * Exposes native APIs to JS global scope
  * @param ctx  Context to enhance
  */
 void expose_system_apis(JSGlobalContextRef ctx) {
     JSObjectRef global = JSContextGetGlobalObject(ctx);
+
+    // Create runtime object
+    JSObjectRef runtime = JSObjectMake(ctx, NULL, NULL);
+    JSStringRef runtime_name = JSStringCreateWithUTF8CString("runtime");
+    JSObjectSetProperty(ctx, global, runtime_name, runtime, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(runtime_name);
+
+    // Add version info
+    JSStringRef version_key = JSStringCreateWithUTF8CString("version");
+    JSStringRef version_val = JSStringCreateWithUTF8CString(RUNTIME_VERSION);
+    JSObjectSetProperty(ctx, runtime, version_key, JSValueMakeString(ctx, version_val), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(version_key);
+    JSStringRelease(version_val);
+
+    // Add runtime name
+    JSStringRef name_key = JSStringCreateWithUTF8CString("name");
+    JSStringRef name_val = JSStringCreateWithUTF8CString(RUNTIME_NAME);
+    JSObjectSetProperty(ctx, runtime, name_key, JSValueMakeString(ctx, name_val), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(name_key);
+    JSStringRelease(name_val);
     
     // Create console object
     JSObjectRef console = JSObjectMake(ctx, NULL, NULL);
@@ -280,6 +321,12 @@ void expose_system_apis(JSGlobalContextRef ctx) {
     JSObjectRef setTimeout_func = JSObjectMakeFunctionWithCallback(ctx, setTimeout_name, js_set_timeout);
     JSObjectSetProperty(ctx, global, setTimeout_name, setTimeout_func, kJSPropertyAttributeNone, NULL);
     JSStringRelease(setTimeout_name);
+
+    // Add clearTimeout
+    JSStringRef clear_timeout_name = JSStringCreateWithUTF8CString("clearTimeout");
+    JSObjectRef clear_timeout_func = JSObjectMakeFunctionWithCallback(ctx, clear_timeout_name, js_clear_timeout);
+    JSObjectSetProperty(ctx, global, clear_timeout_name, clear_timeout_func, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(clear_timeout_name);
 
     // Create process object
     JSObjectRef process = JSObjectMake(ctx, NULL, NULL);

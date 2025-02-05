@@ -1,1 +1,6 @@
-console.log("Command-line arguments:", process.argv);
+const id = setTimeout(() => {
+    console.log("This should not run");
+}, 1000);
+
+clearTimeout(id);
+console.log("Timeout cleared");
