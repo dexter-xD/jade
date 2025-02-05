@@ -34,7 +34,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// Global variables for command-line arguments
+int process_argc;
+char** process_argv;
+
 int main(int argc, char** argv) {
+    process_argc = argc;
+    process_argv = argv;
+
     // Validate arguments
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <script.js>\n", argv[0]);

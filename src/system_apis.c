@@ -39,6 +39,9 @@
 #include <time.h>
 #include "runtime.h"
 
+extern int process_argc;
+extern char** process_argv;
+
 
 // ================== Process API Implementation ================== //
 
@@ -283,6 +286,18 @@ void expose_system_apis(JSGlobalContextRef ctx) {
     JSStringRef process_name = JSStringCreateWithUTF8CString("process");
     JSObjectSetProperty(ctx, global, process_name, process, kJSPropertyAttributeNone, NULL);
     JSStringRelease(process_name);
+
+    // Add process.argv
+    JSValueRef argv_values[process_argc];
+    for (int i = 0; i < process_argc; i++) {
+        JSStringRef arg = JSStringCreateWithUTF8CString(process_argv[i]);
+        argv_values[i] = JSValueMakeString(ctx, arg);
+        JSStringRelease(arg);
+    }
+    JSObjectRef argv_array = JSObjectMakeArray(ctx, process_argc, argv_values, NULL);
+    JSStringRef argv_name = JSStringCreateWithUTF8CString("argv");
+    JSObjectSetProperty(ctx, process, argv_name, argv_array, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(argv_name);
 
     // Add process.exit
     JSStringRef exit_name = JSStringCreateWithUTF8CString("exit");

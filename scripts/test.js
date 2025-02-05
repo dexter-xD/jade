@@ -1,3 +1,1 @@
-console.log("Testing exit...");
-process.exit(0);
-console.log("This should not print");
+console.log("Command-line arguments:", process.argv);
