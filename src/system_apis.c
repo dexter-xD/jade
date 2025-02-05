@@ -36,9 +36,48 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "runtime.h"
 
+
+// ================== Process API Implementation ================== //
+
+/**
+ * process.exit - JS-accessible exit function
+ * Renamed from process_exit to js_process_exit
+ */
+static JSValueRef js_process_exit(JSContextRef ctx, JSObjectRef function,
+                                 JSObjectRef thisObject, size_t argc,
+                                 const JSValueRef args[], JSValueRef* exception) {
+    int code = 0;
+    if (argc > 0) {
+        code = (int)JSValueToNumber(ctx, args[0], exception);
+        if (*exception) return JSValueMakeUndefined(ctx);
+    }
+    
+    // Stop libuv event loop
+    uv_stop(loop);
+    
+    // Exit process
+    exit(code);
+    return JSValueMakeUndefined(ctx);
+}
+
+
 // ================== Helper Function ================== //
+
+/**
+ * Generates a timestamp string in the format "[HH:MM:SS]"
+ * @return  Timestamp string (must be freed by caller)
+ */
+static char* get_timestamp() {
+    time_t now = time(NULL);
+    struct tm* tm_info = localtime(&now);
+
+    char* timestamp = malloc(10);  // "[HH:MM:SS]" + null terminator
+    strftime(timestamp, 10, "[%H:%M:%S]", tm_info);
+    return timestamp;
+}
 
 /**
  * Converts multiple JS values to a concatenated string
@@ -238,4 +277,16 @@ void expose_system_apis(JSGlobalContextRef ctx) {
     JSObjectRef setTimeout_func = JSObjectMakeFunctionWithCallback(ctx, setTimeout_name, js_set_timeout);
     JSObjectSetProperty(ctx, global, setTimeout_name, setTimeout_func, kJSPropertyAttributeNone, NULL);
     JSStringRelease(setTimeout_name);
+
+    // Create process object
+    JSObjectRef process = JSObjectMake(ctx, NULL, NULL);
+    JSStringRef process_name = JSStringCreateWithUTF8CString("process");
+    JSObjectSetProperty(ctx, global, process_name, process, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(process_name);
+
+    // Add process.exit
+    JSStringRef exit_name = JSStringCreateWithUTF8CString("exit");
+    JSObjectRef exit_func = JSObjectMakeFunctionWithCallback(ctx, exit_name, js_process_exit);
+    JSObjectSetProperty(ctx, process, exit_name, exit_func, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(exit_name);
 }

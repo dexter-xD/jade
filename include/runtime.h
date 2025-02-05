@@ -38,6 +38,8 @@
 #include <JavaScriptCore/JavaScript.h>
 #include <uv.h>
 
+extern uv_loop_t* loop;
+
 // ================== JavaScript Engine Interface ================== //
 
 /**
