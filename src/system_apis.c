@@ -60,6 +60,57 @@ static JSValueRef console_log(JSContextRef ctx, JSObjectRef function,
 }
 
 /**
+ * console.warn - Warning output (highlighted)
+ * @param args[0]  Warning message
+ */
+static JSValueRef console_warn(JSContextRef ctx, JSObjectRef function, 
+                              JSObjectRef thisObject, size_t argc, 
+                              const JSValueRef args[], JSValueRef* exception) {
+    JSStringRef message = JSValueToStringCopy(ctx, args[0], exception);
+    size_t len = JSStringGetMaximumUTF8CStringSize(message);
+    char* cmsg = malloc(len);
+    JSStringGetUTF8CString(message, cmsg, len);
+    fprintf(stderr, "\033[33mWARN: %s\033[0m\n", cmsg);  // Yellow color for warnings
+    free(cmsg);
+    JSStringRelease(message);
+    return JSValueMakeUndefined(ctx);
+}
+
+/**
+ * console.info - Informational output
+ * @param args[0]  Info message
+ */
+static JSValueRef console_info(JSContextRef ctx, JSObjectRef function, 
+                              JSObjectRef thisObject, size_t argc, 
+                              const JSValueRef args[], JSValueRef* exception) {
+    JSStringRef message = JSValueToStringCopy(ctx, args[0], exception);
+    size_t len = JSStringGetMaximumUTF8CStringSize(message);
+    char* cmsg = malloc(len);
+    JSStringGetUTF8CString(message, cmsg, len);
+    printf("\033[34mINFO: %s\033[0m\n", cmsg);  // Blue color for info
+    free(cmsg);
+    JSStringRelease(message);
+    return JSValueMakeUndefined(ctx);
+}
+
+/**
+ * console.debug - Debug output (low priority)
+ * @param args[0]  Debug message
+ */
+static JSValueRef console_debug(JSContextRef ctx, JSObjectRef function, 
+                               JSObjectRef thisObject, size_t argc, 
+                               const JSValueRef args[], JSValueRef* exception) {
+    JSStringRef message = JSValueToStringCopy(ctx, args[0], exception);
+    size_t len = JSStringGetMaximumUTF8CStringSize(message);
+    char* cmsg = malloc(len);
+    JSStringGetUTF8CString(message, cmsg, len);
+    printf("\033[90mDEBUG: %s\033[0m\n", cmsg);  // Gray color for debug
+    free(cmsg);
+    JSStringRelease(message);
+    return JSValueMakeUndefined(ctx);
+}
+
+/**
  * console.error implementation
  * @param args[0]  Error message
  */
@@ -71,8 +122,8 @@ static JSValueRef console_error(JSContextRef ctx, JSObjectRef function,
     char* cmsg = malloc(len);
     JSStringGetUTF8CString(message, cmsg, len);
     
-    // Print to stderr
-    fprintf(stderr, "ERROR: %s\n", cmsg);
+    // Print error in red color to stderr
+    fprintf(stderr, "\033[31mERROR: %s\033[0m\n", cmsg); 
     
     free(cmsg);
     JSStringRelease(message);
@@ -122,6 +173,24 @@ void expose_system_apis(JSGlobalContextRef ctx) {
     JSObjectRef log_func = JSObjectMakeFunctionWithCallback(ctx, log_name, console_log);
     JSObjectSetProperty(ctx, console, log_name, log_func, kJSPropertyAttributeNone, NULL);
     JSStringRelease(log_name);
+    
+    // Add console.warn
+    JSStringRef warn_name = JSStringCreateWithUTF8CString("warn");
+    JSObjectRef warn_func = JSObjectMakeFunctionWithCallback(ctx, warn_name, console_warn);
+    JSObjectSetProperty(ctx, console, warn_name, warn_func, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(warn_name);
+    
+    // Add console.info
+    JSStringRef info_name = JSStringCreateWithUTF8CString("info");
+    JSObjectRef info_func = JSObjectMakeFunctionWithCallback(ctx, info_name, console_info);
+    JSObjectSetProperty(ctx, console, info_name, info_func, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(info_name);
+    
+    // Add console.debug
+    JSStringRef debug_name = JSStringCreateWithUTF8CString("debug");
+    JSObjectRef debug_func = JSObjectMakeFunctionWithCallback(ctx, debug_name, console_debug);
+    JSObjectSetProperty(ctx, console, debug_name, debug_func, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(debug_name);
     
     // Add console.error
     JSStringRef error_name = JSStringCreateWithUTF8CString("error");
