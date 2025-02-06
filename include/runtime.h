@@ -39,57 +39,91 @@
 #include <uv.h>
 
 
-// ================== JavaScript Engine Interface ================== //
+// =====================================================================================
+//                          JAVASCRIPT ENGINE INTERFACE
+// =====================================================================================
 
 /**
- * Creates a new JavaScript execution context with exposed system APIs
- * @return Initialized JSC global context
+ * Creates a new JavaScript execution context with exposed system APIs.
+ * @return Initialized JSC global context.
  */
 JSGlobalContextRef create_js_context();
 
 /**
- * Executes JavaScript code in the given context
- * @param ctx  Active JSC context
- * @param script  Null-terminated JS code string
+ * Executes JavaScript code in the given context.
+ * @param ctx     Active JSC context.
+ * @param script  Null-terminated JS code string.
  */
 void execute_js(JSGlobalContextRef ctx, const char* script);
 
-// ================== Event Loop Interface ================== //
 
+// =====================================================================================
+//                          EVENT LOOP INTERFACE
+// =====================================================================================
+
+/**
+ * Global event loop instance.
+ */
 extern uv_loop_t* loop;
 
 /**
- * Initializes libuv's default event loop
+ * Initializes libuv's default event loop.
  */
 void init_event_loop();
 
 /**
- * Starts the event loop (blocks until all handles are closed)
+ * Starts the event loop (blocks until all handles are closed).
  */
 void run_event_loop();
 
 
-// ================== Timer API ================== //
+// =====================================================================================
+//                          TIMER API
+// =====================================================================================
 
+/**
+ * Global timer ID tracker.
+ */
 extern uint32_t next_timer_id;
 
 /**
- * Schedules a JS function to execute after specified delay
- * @param ctx       JS context for callback execution
- * @param callback  JS function reference
- * @param timeout   Delay in milliseconds
+ * Schedules a JS function to execute after a specified delay.
+ * @param ctx       JS context for callback execution.
+ * @param callback  JS function reference.
+ * @param timeout   Delay in milliseconds.
  */
 void set_timeout(JSContextRef ctx, JSObjectRef callback, uint64_t timeout);
+
+/**
+ * Cancels a scheduled timeout function.
+ * @param ctx       JS context for callback execution.
+ * @param timer_id  ID of the timeout to clear.
+ */
 void clear_timeout(JSContextRef ctx, uint32_t timer_id);
+
+/**
+ * Schedules a JS function to execute repeatedly at a fixed interval.
+ * @param ctx       JS context for callback execution.
+ * @param callback  JS function reference.
+ * @param interval  Interval time in milliseconds.
+ */
 void set_interval(JSContextRef ctx, JSObjectRef callback, uint64_t interval);
+
+/**
+ * Cancels a scheduled interval function.
+ * @param ctx       JS context for callback execution.
+ * @param timer_id  ID of the interval to clear.
+ */
 void clear_interval(JSContextRef ctx, uint32_t timer_id);
 
 
-// ================== System API Interface ================== //
+// =====================================================================================
+//                          SYSTEM API INTERFACE
+// =====================================================================================
 
 /**
- * Exposes native functionality to JS global scope
- * @param ctx  JS context to enhance with system APIs
+ * Binds native system APIs to the JavaScript global scope.
+ * @param ctx  JS context to enhance with system APIs.
  */
 void bind_js_native_apis(JSGlobalContextRef ctx);
 
