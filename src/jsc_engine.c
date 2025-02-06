@@ -38,7 +38,7 @@ JSGlobalContextRef create_js_context() {
     JSGlobalContextRef ctx = JSGlobalContextCreate(NULL);
     
     // Attach system APIs to global object
-    expose_system_apis(ctx);
+    bind_js_native_apis(ctx);
     
     return ctx;
 }

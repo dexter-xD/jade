@@ -35,7 +35,6 @@ run_test() {
         echo "Test: $test_name" >> "$output_file"
         echo "---------------------------------" >> "$output_file"
 
-        # Run the test and strip ANSI colors before saving
         "$RUNTIME" "$test_script" 2>&1 | strip_ansi >> "$output_file"
 
         if [ $? -eq 0 ]; then
@@ -71,7 +70,6 @@ run_test "Timers API" "scripts/tests/timers.test.js"
 run_test "Process API" "scripts/tests/process.test.js"
 run_test "Runtime Info" "scripts/tests/runtime.test.js"
 
-# Special test for process.exit
 if [ "$MODE" == "save" ]; then
     echo "Saving process.exit test result..."
     "$RUNTIME" "scripts/tests/process.test.js" arg1 arg2 2>&1 | strip_ansi > "$RESULTS_DIR/process_exit_test.txt"

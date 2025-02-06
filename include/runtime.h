@@ -91,6 +91,6 @@ void clear_interval(JSContextRef ctx, uint32_t timer_id);
  * Exposes native functionality to JS global scope
  * @param ctx  JS context to enhance with system APIs
  */
-void expose_system_apis(JSGlobalContextRef ctx);
+void bind_js_native_apis(JSGlobalContextRef ctx);
 
 #endif // RUNTIME_H

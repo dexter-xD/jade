@@ -1,14 +1,16 @@
 /**
  * =====================================================================================
  * 
- *        SYSTEM_APIS.C - Native Functionality Exposure to JavaScript
+ *        JS_BINDINGS.C - Native Functionality Bindings for JavaScript
  * 
  * =====================================================================================
  * 
- * Implements bridge between native capabilities and JS environment:
- * - Console API (log/error)
- * - Timer API (setTimeout)
- * - Future expansion: FS, Network, etc.
+ * This file implements the bridge between native capabilities and the JavaScript
+ * environment. It exposes the following APIs to JavaScript:
+ * - Console API (log, warn, info, debug, error)
+ * - Timer API (setTimeout, clearTimeout, setInterval, clearInterval)
+ * - Process API (argv, exit)
+ * - Runtime Info (name, version)
  * 
  * Architecture:
  * ┌─────────────┐       ┌─────────────┐
@@ -40,35 +42,11 @@
 #include "runtime.h"
 #include "version.h"
 
+// External variables
 extern int process_argc;
 extern char** process_argv;
 
-
-// ================== Process API Implementation ================== //
-
-/**
- * process.exit - JS-accessible exit function
- * Renamed from process_exit to js_process_exit
- */
-static JSValueRef js_process_exit(JSContextRef ctx, JSObjectRef function,
-                                 JSObjectRef thisObject, size_t argc,
-                                 const JSValueRef args[], JSValueRef* exception) {
-    int code = 0;
-    if (argc > 0) {
-        code = (int)JSValueToNumber(ctx, args[0], exception);
-        if (*exception) return JSValueMakeUndefined(ctx);
-    }
-    
-    // Stop libuv event loop
-    uv_stop(loop);
-    
-    // Exit process
-    exit(code);
-    return JSValueMakeUndefined(ctx);
-}
-
-
-// ================== Helper Function ================== //
+// ================== Helper Functions ================== //
 
 /**
  * Generates a timestamp string in the format "[HH:MM:SS]"
@@ -131,8 +109,7 @@ static char* js_values_to_string(JSContextRef ctx, size_t argc, const JSValueRef
     return result;
 }
 
-
-// ================== Console API Implementations ================== //
+// ================== Console API ================== //
 
 /**
  * Generic console output function
@@ -145,7 +122,6 @@ static char* js_values_to_string(JSContextRef ctx, size_t argc, const JSValueRef
  * @param args      Array of JS values
  * @param exception Exception object (if any)
  */
-
 static JSValueRef console_output(const char* prefix, const char* color, JSContextRef ctx, JSObjectRef function,
                                  JSObjectRef thisObject, size_t argc, const JSValueRef args[], JSValueRef* exception) {
     if (argc == 0) {
@@ -161,52 +137,38 @@ static JSValueRef console_output(const char* prefix, const char* color, JSContex
     return JSValueMakeUndefined(ctx);
 }
 
-/**
- * console.log - Standard log output
- */
+// Console methods
 static JSValueRef console_log(JSContextRef ctx, JSObjectRef function, 
                               JSObjectRef thisObject, size_t argc, 
                               const JSValueRef args[], JSValueRef* exception) {
     return console_output("LOG", "\033[0m", ctx, function, thisObject, argc, args, exception);
 }
 
-
-/**
- * console.warn - Warning output (highlighted)
- */
 static JSValueRef console_warn(JSContextRef ctx, JSObjectRef function, 
                                JSObjectRef thisObject, size_t argc, 
                                const JSValueRef args[], JSValueRef* exception) {
     return console_output("WARN", "\033[33m", ctx, function, thisObject, argc, args, exception);
 }
 
-/**
- * console.info - Informational output
- */
 static JSValueRef console_info(JSContextRef ctx, JSObjectRef function, 
                                JSObjectRef thisObject, size_t argc, 
                                const JSValueRef args[], JSValueRef* exception) {
     return console_output("INFO", "\033[34m", ctx, function, thisObject, argc, args, exception);
 }
 
-/**
- * console.debug - Debug output (low priority)
- */
 static JSValueRef console_debug(JSContextRef ctx, JSObjectRef function, 
                                 JSObjectRef thisObject, size_t argc, 
                                 const JSValueRef args[], JSValueRef* exception) {
     return console_output("DEBUG", "\033[90m", ctx, function, thisObject, argc, args, exception);
 }
 
-/**
- * console.error - Error output (highlighted in red)
- */
 static JSValueRef console_error(JSContextRef ctx, JSObjectRef function,
                                JSObjectRef thisObject, size_t argc,
                                const JSValueRef args[], JSValueRef* exception) {
     return console_output("ERROR", "\033[31m", ctx, function, thisObject, argc, args, exception);
 }
 
+// ================== Timer API ================== //
 
 /**
  * JS-accessible setTimeout implementation
@@ -294,11 +256,32 @@ static JSValueRef js_clear_interval(JSContextRef ctx, JSObjectRef function,
     return JSValueMakeUndefined(ctx);
 }
 
+// ================== Process API ================== //
+
+/**
+ * process.exit - JS-accessible exit function
+ */
+static JSValueRef js_process_exit(JSContextRef ctx, JSObjectRef function,
+                                 JSObjectRef thisObject, size_t argc,
+                                 const JSValueRef args[], JSValueRef* exception) {
+    int code = 0;
+    if (argc > 0) {
+        code = (int)JSValueToNumber(ctx, args[0], exception);
+        if (*exception) return JSValueMakeUndefined(ctx);
+    }
+
+    uv_stop(loop);
+    exit(code);
+    return JSValueMakeUndefined(ctx);
+}
+
+// ================== API Exposure ================== //
+
 /**
  * Exposes native APIs to JS global scope
  * @param ctx  Context to enhance
  */
-void expose_system_apis(JSGlobalContextRef ctx) {
+void bind_js_native_apis(JSGlobalContextRef ctx) {
     JSObjectRef global = JSContextGetGlobalObject(ctx);
 
     // Create runtime object
@@ -320,44 +303,27 @@ void expose_system_apis(JSGlobalContextRef ctx) {
     JSObjectSetProperty(ctx, runtime, name_key, JSValueMakeString(ctx, name_val), kJSPropertyAttributeNone, NULL);
     JSStringRelease(name_key);
     JSStringRelease(name_val);
-    
+
     // Create console object
     JSObjectRef console = JSObjectMake(ctx, NULL, NULL);
     JSStringRef console_name = JSStringCreateWithUTF8CString("console");
     JSObjectSetProperty(ctx, global, console_name, console, kJSPropertyAttributeNone, NULL);
     JSStringRelease(console_name);
-    
-    // Add console.log
-    JSStringRef log_name = JSStringCreateWithUTF8CString("log");
-    JSObjectRef log_func = JSObjectMakeFunctionWithCallback(ctx, log_name, console_log);
-    JSObjectSetProperty(ctx, console, log_name, log_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(log_name);
-    
-    // Add console.warn
-    JSStringRef warn_name = JSStringCreateWithUTF8CString("warn");
-    JSObjectRef warn_func = JSObjectMakeFunctionWithCallback(ctx, warn_name, console_warn);
-    JSObjectSetProperty(ctx, console, warn_name, warn_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(warn_name);
-    
-    // Add console.info
-    JSStringRef info_name = JSStringCreateWithUTF8CString("info");
-    JSObjectRef info_func = JSObjectMakeFunctionWithCallback(ctx, info_name, console_info);
-    JSObjectSetProperty(ctx, console, info_name, info_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(info_name);
-    
-    // Add console.debug
-    JSStringRef debug_name = JSStringCreateWithUTF8CString("debug");
-    JSObjectRef debug_func = JSObjectMakeFunctionWithCallback(ctx, debug_name, console_debug);
-    JSObjectSetProperty(ctx, console, debug_name, debug_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(debug_name);
-    
-    // Add console.error
-    JSStringRef error_name = JSStringCreateWithUTF8CString("error");
-    JSObjectRef error_func = JSObjectMakeFunctionWithCallback(ctx, error_name, console_error);
-    JSObjectSetProperty(ctx, console, error_name, error_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(error_name);
-    
-    // Add global setTimeout
+
+    // Add console methods
+    const char* methods[] = { "log", "warn", "info", "debug", "error" };
+    JSValueRef (*functions[])(JSContextRef, JSObjectRef, JSObjectRef, size_t, const JSValueRef[], JSValueRef*) = {
+        console_log, console_warn, console_info, console_debug, console_error
+    };
+
+    for (int i = 0; i < 5; i++) {
+        JSStringRef name = JSStringCreateWithUTF8CString(methods[i]);
+        JSObjectRef func = JSObjectMakeFunctionWithCallback(ctx, name, functions[i]);
+        JSObjectSetProperty(ctx, console, name, func, kJSPropertyAttributeNone, NULL);
+        JSStringRelease(name);
+    }
+
+    // Add setTimeout
     JSStringRef setTimeout_name = JSStringCreateWithUTF8CString("setTimeout");
     JSObjectRef setTimeout_func = JSObjectMakeFunctionWithCallback(ctx, setTimeout_name, js_set_timeout);
     JSObjectSetProperty(ctx, global, setTimeout_name, setTimeout_func, kJSPropertyAttributeNone, NULL);

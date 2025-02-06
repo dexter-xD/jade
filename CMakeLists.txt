@@ -16,7 +16,7 @@ include_directories(
 add_executable(jade
     src/jsc_engine.c
     src/uv_event_loop.c
-    src/system_apis.c
+    src/js_bindings.c
     src/main.c
 )
 
