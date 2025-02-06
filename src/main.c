@@ -47,18 +47,21 @@ void print_version() {
 
 // Function to print help/usage information
 void print_help() {
-    printf("Usage: jade [options] <script.js>\n");
+    printf("Usage: jade [options] [script.js]\n");
     printf("Options:\n");
-    printf("  --version   Print version information\n");
-    printf("  --help      Print this help message\n");
+    printf("  --version   Print version\n");
+    printf("  --help      Show help\n");
+    printf("  --eval <code> Execute inline code\n");
 }
 
 
 int main(int argc, char** argv) {
     process_argc = argc;
     process_argv = argv;
+    char* eval_code = NULL;
+    char* script_file = NULL;
 
-    // Handle command-line flags
+    // Parse command-line arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--version") == 0) {
             print_version();
@@ -66,12 +69,32 @@ int main(int argc, char** argv) {
         } else if (strcmp(argv[i], "--help") == 0) {
             print_help();
             return 0;
+        } else if (strcmp(argv[i], "--eval") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "Error: --eval requires code argument\n");
+                return 1;
+            }
+            eval_code = argv[i + 1];
+            i++; // Skip code argument
+        } else {
+            script_file = argv[i];
+            break;
         }
     }
 
-    // Ensure a script file is provided
-    if (argc < 2) {
-        fprintf(stderr, "Error: No script file provided.\n");
+    // Handle --eval
+    if (eval_code != NULL) {
+        JSGlobalContextRef ctx = create_js_context();
+        init_event_loop();
+        execute_js(ctx, eval_code);
+        run_event_loop();
+        JSGlobalContextRelease(ctx);
+        return 0;
+    }
+
+    // Handle script file
+    if (!script_file) {
+        fprintf(stderr, "Error: No script or --eval provided\n");
         print_help();
         return 1;
     }
