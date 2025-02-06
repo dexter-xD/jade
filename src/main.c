@@ -31,25 +31,57 @@
  */
 
 #include "runtime.h"
+#include "version.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // Global variables for command-line arguments
 int process_argc;
 char** process_argv;
 
+// Function to print version information
+void print_version() {
+    printf("Jade Runtime v%s\n", RUNTIME_VERSION);
+}
+
+// Function to print help/usage information
+void print_help() {
+    printf("Usage: jade [options] <script.js>\n");
+    printf("Options:\n");
+    printf("  --version   Print version information\n");
+    printf("  --help      Print this help message\n");
+}
+
+
 int main(int argc, char** argv) {
     process_argc = argc;
     process_argv = argv;
 
-    // Validate arguments
+    // Handle command-line flags
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--version") == 0) {
+            print_version();
+            return 0;
+        } else if (strcmp(argv[i], "--help") == 0) {
+            print_help();
+            return 0;
+        }
+    }
+
+    // Ensure a script file is provided
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s <script.js>\n", argv[0]);
+        fprintf(stderr, "Error: No script file provided.\n");
+        print_help();
         return 1;
     }
 
     // Read JS file
     FILE* f = fopen(argv[1], "rb");
+    if (!f) {
+        fprintf(stderr, "Error: Could not open file %s\n", argv[1]);
+        return 1;
+    }
     fseek(f, 0, SEEK_END);
     long len = ftell(f);
     rewind(f);
