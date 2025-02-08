@@ -370,4 +370,16 @@ void bind_js_native_apis(JSGlobalContextRef ctx) {
     JSObjectRef exit_func = JSObjectMakeFunctionWithCallback(ctx, exit_name, js_process_exit);
     JSObjectSetProperty(ctx, process, exit_name, exit_func, kJSPropertyAttributeNone, NULL);
     JSStringRelease(exit_name);
+
+    // Create `fs` object
+    JSObjectRef fs = JSObjectMake(ctx, NULL, NULL);
+    JSStringRef fsName = JSStringCreateWithUTF8CString("fs");
+    JSObjectSetProperty(ctx, global, fsName, fs, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(fsName);
+
+    // Add `fs.readFile`
+    JSStringRef readFileName = JSStringCreateWithUTF8CString("readFile");
+    JSObjectRef readFileFunc = JSObjectMakeFunctionWithCallback(ctx, readFileName, fs_read_file);
+    JSObjectSetProperty(ctx, fs, readFileName, readFileFunc, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(readFileName);
 }

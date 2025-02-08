@@ -17,6 +17,7 @@ add_executable(jade
     src/jsc_engine.c
     src/uv_event_loop.c
     src/js_bindings.c
+    src/fs_api.c
     src/main.c
 )
 
