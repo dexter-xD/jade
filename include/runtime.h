@@ -116,10 +116,20 @@ void set_interval(JSContextRef ctx, JSObjectRef callback, uint64_t interval);
  */
 void clear_interval(JSContextRef ctx, uint32_t timer_id);
 
-// Asynchronous readFile function
+/**
+ * Asynchronous readFile function
+ */
 JSValueRef fs_read_file(JSContextRef ctx, JSObjectRef function,
                         JSObjectRef thisObject, size_t argc,
                         const JSValueRef args[], JSValueRef* exception);
+
+/**
+ * Asynchronous writeFile function
+ */
+JSValueRef fs_write_file(JSContextRef ctx, JSObjectRef function,
+                         JSObjectRef thisObject, size_t argc,
+                         const JSValueRef args[], JSValueRef* exception);
+
 
 
 // =====================================================================================

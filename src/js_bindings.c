@@ -382,4 +382,10 @@ void bind_js_native_apis(JSGlobalContextRef ctx) {
     JSObjectRef readFileFunc = JSObjectMakeFunctionWithCallback(ctx, readFileName, fs_read_file);
     JSObjectSetProperty(ctx, fs, readFileName, readFileFunc, kJSPropertyAttributeNone, NULL);
     JSStringRelease(readFileName);
+
+    // Add `fs.writeFile`
+    JSStringRef writeFileName = JSStringCreateWithUTF8CString("writeFile");
+    JSObjectRef writeFileFunc = JSObjectMakeFunctionWithCallback(ctx, writeFileName, fs_write_file);
+    JSObjectSetProperty(ctx, fs, writeFileName, writeFileFunc, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(writeFileName);
 }
