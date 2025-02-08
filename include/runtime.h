@@ -161,6 +161,13 @@ JSValueRef client_write(JSContextRef ctx, JSObjectRef function,
                         JSObjectRef thisObject, size_t argc,
                         const JSValueRef args[], JSValueRef* exception);
 
+/**
+ * Performs an HTTP GET request to the specified URL.
+ */
+JSValueRef http_get(JSContextRef ctx, JSObjectRef function,
+                    JSObjectRef thisObject, size_t argc,
+                    const JSValueRef args[], JSValueRef* exception); 
+
 
 
 // =====================================================================================

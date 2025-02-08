@@ -413,4 +413,17 @@ void bind_js_native_apis(JSGlobalContextRef ctx) {
     JSObjectSetProperty(ctx, net, listenName, listenFunc, kJSPropertyAttributeNone, NULL);
     JSStringRelease(listenName);
 
+    // Create `http` object
+JSObjectRef http = JSObjectMake(ctx, NULL, NULL);
+JSStringRef httpName = JSStringCreateWithUTF8CString("http");
+JSObjectSetProperty(ctx, global, httpName, http, kJSPropertyAttributeNone, NULL);
+JSStringRelease(httpName);
+
+// Add `http.get`
+JSStringRef getName = JSStringCreateWithUTF8CString("get");
+JSObjectRef getFunc = JSObjectMakeFunctionWithCallback(ctx, getName, http_get);
+JSObjectSetProperty(ctx, http, getName, getFunc, kJSPropertyAttributeNone, NULL);
+JSStringRelease(getName);
+
+
 }

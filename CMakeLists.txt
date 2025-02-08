@@ -19,6 +19,7 @@ add_executable(jade
     src/js_bindings.c
     src/fs_api.c
     src/net_api.c
+    src/http_api.c
     src/main.c
 )
 

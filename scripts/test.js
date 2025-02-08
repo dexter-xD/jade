@@ -1,12 +1,7 @@
-console.log("Starting server...");
-
-const server = net.createServer((client) => {
-    console.log("New client connected");
-
-    setTimeout(() => {
-        client.write("Hello from server!\n");
-    }, 2000);
+http.get("http://httpbin.org/json", (err, data) => {
+    if (err) {
+        console.error("Error:", err);
+    } else {
+        console.log("Response:", data);  
+    }
 });
-
-server.listen(8080);
-console.log("Server running on port 8080");
