@@ -1,7 +1,7 @@
-http.get("http://httpbin.org/json", (err, data) => {
-    if (err) {
-        console.error("Error:", err);
-    } else {
-        console.log("Response:", data);  
-    }
+const server = http.createServer((req, res) => {
+    console.log(`Received ${req.method} request for ${req.url}`);
+    res.end();
 });
+
+server.listen(8080);
+console.log("Server running on port 8080");

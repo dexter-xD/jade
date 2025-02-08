@@ -168,6 +168,20 @@ JSValueRef http_get(JSContextRef ctx, JSObjectRef function,
                     JSObjectRef thisObject, size_t argc,
                     const JSValueRef args[], JSValueRef* exception); 
 
+/**
+ * Creates an HTTP server that listens on the given port.
+ */
+JSValueRef http_create_server(JSContextRef ctx, JSObjectRef function,
+                              JSObjectRef thisObject, size_t argc,
+                              const JSValueRef args[], JSValueRef* exception);
+
+/**
+ * Starts the HTTP server on the given port.
+ */
+JSValueRef http_server_listen(JSContextRef ctx, JSObjectRef function,
+                              JSObjectRef thisObject, size_t argc,
+                              const JSValueRef args[], JSValueRef* exception);
+
 
 
 // =====================================================================================

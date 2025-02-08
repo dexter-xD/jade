@@ -49,10 +49,14 @@ void on_new_connection(uv_stream_t* server, int status) {
         ClientRequest* cr = (ClientRequest*)malloc(sizeof(ClientRequest));
         cr->client = client;
 
-        // Create a JavaScript client object
+        // Create a JavaScript class for the client object
         JSClassDefinition classDef = kJSClassDefinitionEmpty;
+        classDef.version = 0;
         JSClassRef clientClass = JSClassCreate(&classDef);
+
+        // Create the JavaScript client object
         JSObjectRef clientObject = JSObjectMake(sr->ctx, clientClass, cr);
+        JSClassRelease(clientClass);
 
         // Attach `client.write(data)`
         JSStringRef writeName = JSStringCreateWithUTF8CString("write");
@@ -60,13 +64,21 @@ void on_new_connection(uv_stream_t* server, int status) {
         JSObjectSetProperty(sr->ctx, clientObject, writeName, writeFunc, kJSPropertyAttributeNone, NULL);
         JSStringRelease(writeName);
 
+        // **Ensure client object has useful properties**
+        JSStringRef idKey = JSStringCreateWithUTF8CString("id");
+        JSValueRef idValue = JSValueMakeNumber(sr->ctx, (double)(uintptr_t)client);
+        JSObjectSetProperty(sr->ctx, clientObject, idKey, idValue, kJSPropertyAttributeNone, NULL);
+        JSStringRelease(idKey);
+
         // Call JavaScript callback
         JSValueRef args[] = { clientObject };
         JSObjectCallAsFunction(sr->ctx, sr->callback, NULL, 1, args, NULL);
     } else {
         uv_close((uv_handle_t*)client, NULL);
+        free(client);
     }
 }
+
 
 
 // `net.createServer(callback)`
@@ -167,4 +179,4 @@ JSValueRef client_write(JSContextRef ctx, JSObjectRef function,
     uv_write(writeReq, (uv_stream_t*)cr->client, &buffer, 1, on_client_write);
 
     return JSValueMakeUndefined(ctx);
-}
+}     

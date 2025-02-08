@@ -402,28 +402,45 @@ void bind_js_native_apis(JSGlobalContextRef ctx) {
     JSStringRelease(netName);
 
     // Add `net.createServer`
-    JSStringRef createServerName = JSStringCreateWithUTF8CString("createServer");
-    JSObjectRef createServerFunc = JSObjectMakeFunctionWithCallback(ctx, createServerName, net_create_server);
-    JSObjectSetProperty(ctx, net, createServerName, createServerFunc, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(createServerName);
+    JSStringRef netCreateServerName = JSStringCreateWithUTF8CString("createServer");
+    JSObjectRef netCreateServerFunc = JSObjectMakeFunctionWithCallback(ctx, netCreateServerName, net_create_server);
+    JSObjectSetProperty(ctx, net, netCreateServerName, netCreateServerFunc, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(netCreateServerName);
 
     // Add `server.listen`
-    JSStringRef listenName = JSStringCreateWithUTF8CString("listen");
-    JSObjectRef listenFunc = JSObjectMakeFunctionWithCallback(ctx, listenName, net_server_listen);
-    JSObjectSetProperty(ctx, net, listenName, listenFunc, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(listenName);
+    JSStringRef netListenName = JSStringCreateWithUTF8CString("listen");
+    JSObjectRef netListenFunc = JSObjectMakeFunctionWithCallback(ctx, netListenName, net_server_listen);
+    JSObjectSetProperty(ctx, net, netListenName, netListenFunc, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(netListenName);
 
-    // Create `http` object
-JSObjectRef http = JSObjectMake(ctx, NULL, NULL);
-JSStringRef httpName = JSStringCreateWithUTF8CString("http");
-JSObjectSetProperty(ctx, global, httpName, http, kJSPropertyAttributeNone, NULL);
-JSStringRelease(httpName);
 
-// Add `http.get`
-JSStringRef getName = JSStringCreateWithUTF8CString("get");
-JSObjectRef getFunc = JSObjectMakeFunctionWithCallback(ctx, getName, http_get);
-JSObjectSetProperty(ctx, http, getName, getFunc, kJSPropertyAttributeNone, NULL);
-JSStringRelease(getName);
+    // === Create or Retrieve `http` Object ===
+    JSStringRef httpName = JSStringCreateWithUTF8CString("http");
+    JSObjectRef http;
+    JSValueRef existingHttp = JSObjectGetProperty(ctx, global, httpName, NULL);
 
+    if (JSValueIsObject(ctx, existingHttp)) {
+        http = (JSObjectRef)existingHttp;  // Use existing object
+    } else {
+        http = JSObjectMake(ctx, NULL, NULL);  // Create new object
+        JSObjectSetProperty(ctx, global, httpName, http, kJSPropertyAttributeNone, NULL);
+    }
+    JSStringRelease(httpName);
+
+    // === Add `http.get` only if not defined ===
+    JSStringRef getName = JSStringCreateWithUTF8CString("get");
+    if (!JSObjectHasProperty(ctx, http, getName)) {
+        JSObjectRef getFunc = JSObjectMakeFunctionWithCallback(ctx, getName, http_get);
+        JSObjectSetProperty(ctx, http, getName, getFunc, kJSPropertyAttributeNone, NULL);
+    }
+    JSStringRelease(getName);
+
+    // === Add `http.createServer` only if not defined ===
+    JSStringRef createServerName = JSStringCreateWithUTF8CString("createServer");
+    if (!JSObjectHasProperty(ctx, http, createServerName)) {
+        JSObjectRef createServerFunc = JSObjectMakeFunctionWithCallback(ctx, createServerName, http_create_server);
+        JSObjectSetProperty(ctx, http, createServerName, createServerFunc, kJSPropertyAttributeNone, NULL);
+    }
+    JSStringRelease(createServerName);
 
 }
