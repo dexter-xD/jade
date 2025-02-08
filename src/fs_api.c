@@ -23,6 +23,13 @@ typedef struct {
     uv_buf_t buffer;
 } FileWriteRequest;
 
+// File Existence Check Request Structure
+typedef struct {
+    uv_fs_t req;
+    JSContextRef ctx;
+    JSObjectRef callback;
+} FileExistsRequest;
+
 
 // Read Callback Function
 void on_file_read(uv_fs_t* req) {
@@ -282,6 +289,92 @@ JSValueRef fs_write_file(JSContextRef ctx, JSObjectRef function,
     // Open File Asynchronously (Create/Truncate mode)
     uv_fs_open(uv_default_loop(), &fw->req, path, O_WRONLY | O_CREAT | O_TRUNC, 0644, on_file_open_write);
     fw->req.data = fw;
+    free(path);
+
+    return JSValueMakeUndefined(ctx);
+}
+
+// Stat Callback Function
+void on_file_stat(uv_fs_t* req) {
+    FileExistsRequest* fe = (FileExistsRequest*)req->data;
+    uv_fs_req_cleanup(req);
+
+    if (!fe) {
+        fprintf(stderr, "Error: FileExistsRequest is NULL\n");
+        return;
+    }
+
+    JSValueRef args[2];
+
+    if (req->result < 0) {
+        // File does not exist
+        args[0] = JSValueMakeNull(fe->ctx);
+        args[1] = JSValueMakeBoolean(fe->ctx, false);
+    } else {
+        // File exists
+        args[0] = JSValueMakeNull(fe->ctx);
+        args[1] = JSValueMakeBoolean(fe->ctx, true);
+    }
+
+    // Call the JavaScript callback
+    JSObjectCallAsFunction(fe->ctx, fe->callback, NULL, 2, args, NULL);
+
+    // Cleanup
+    JSValueUnprotect(fe->ctx, fe->callback);
+    free(fe);
+}
+
+// `fs.exists(path, callback)`
+JSValueRef fs_exists(JSContextRef ctx, JSObjectRef function,
+                     JSObjectRef thisObject, size_t argc,
+                     const JSValueRef args[], JSValueRef* exception) {
+    if (argc < 2) {
+        JSStringRef errMsg = JSStringCreateWithUTF8CString("fs.exists requires a path and callback");
+        *exception = JSValueMakeString(ctx, errMsg);
+        JSStringRelease(errMsg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Convert JS string (path)
+    JSStringRef pathRef = JSValueToStringCopy(ctx, args[0], exception);
+    size_t pathLen = JSStringGetMaximumUTF8CStringSize(pathRef);
+    char* path = (char*)malloc(pathLen);
+    if (!path) {
+        JSStringRelease(pathRef);
+        JSStringRef errMsg = JSStringCreateWithUTF8CString("Memory allocation failed");
+        *exception = JSValueMakeString(ctx, errMsg);
+        JSStringRelease(errMsg);
+        return JSValueMakeUndefined(ctx);
+    }
+    JSStringGetUTF8CString(pathRef, path, pathLen);
+    JSStringRelease(pathRef);
+
+    // Ensure callback is a function
+    if (!JSValueIsObject(ctx, args[1]) || !JSObjectIsFunction(ctx, (JSObjectRef)args[1])) {
+        free(path);
+        JSStringRef errMsg = JSStringCreateWithUTF8CString("Second argument must be a function");
+        *exception = JSValueMakeString(ctx, errMsg);
+        JSStringRelease(errMsg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Create File Exists Request
+    FileExistsRequest* fe = (FileExistsRequest*)malloc(sizeof(FileExistsRequest));
+    if (!fe) {
+        free(path);
+        JSStringRef errMsg = JSStringCreateWithUTF8CString("Memory allocation failed");
+        *exception = JSValueMakeString(ctx, errMsg);
+        JSStringRelease(errMsg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    fe->ctx = ctx;
+    fe->callback = (JSObjectRef)args[1];
+    JSValueProtect(ctx, fe->callback);
+
+    // Check File Existence Asynchronously
+    uv_fs_stat(uv_default_loop(), &fe->req, path, on_file_stat);
+    fe->req.data = fe;
     free(path);
 
     return JSValueMakeUndefined(ctx);

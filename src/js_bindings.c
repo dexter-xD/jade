@@ -388,4 +388,10 @@ void bind_js_native_apis(JSGlobalContextRef ctx) {
     JSObjectRef writeFileFunc = JSObjectMakeFunctionWithCallback(ctx, writeFileName, fs_write_file);
     JSObjectSetProperty(ctx, fs, writeFileName, writeFileFunc, kJSPropertyAttributeNone, NULL);
     JSStringRelease(writeFileName);
+
+    // Add `fs.exists`
+    JSStringRef existsName = JSStringCreateWithUTF8CString("exists");
+    JSObjectRef existsFunc = JSObjectMakeFunctionWithCallback(ctx, existsName, fs_exists);
+    JSObjectSetProperty(ctx, fs, existsName, existsFunc, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(existsName);
 }

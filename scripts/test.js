@@ -13,3 +13,11 @@ fs.writeFile("output.txt", "Hello from C runtime!", (err) => {
         console.log("File written successfully!");
     }
 });
+
+fs.exists("/home/dexter/projects/jade/scripts/test.txt", (err, exists) => {
+    if (err) {
+        console.error("Error:", err);
+    } else {
+        console.log("File exists:", exists);
+    }
+});

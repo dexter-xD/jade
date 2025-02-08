@@ -130,6 +130,14 @@ JSValueRef fs_write_file(JSContextRef ctx, JSObjectRef function,
                          JSObjectRef thisObject, size_t argc,
                          const JSValueRef args[], JSValueRef* exception);
 
+/**
+ * Asynchronous exists function
+ */
+JSValueRef fs_exists(JSContextRef ctx, JSObjectRef function,
+                     JSObjectRef thisObject, size_t argc,
+                     const JSValueRef args[], JSValueRef* exception);
+
+
 
 
 // =====================================================================================
