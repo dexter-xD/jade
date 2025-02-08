@@ -154,6 +154,13 @@ JSValueRef net_server_listen(JSContextRef ctx, JSObjectRef function,
                              const JSValueRef args[], JSValueRef* exception);
 
 
+/**
+ * Writes data to a connected client socket.
+ */
+JSValueRef client_write(JSContextRef ctx, JSObjectRef function,
+                        JSObjectRef thisObject, size_t argc,
+                        const JSValueRef args[], JSValueRef* exception);
+
 
 
 // =====================================================================================

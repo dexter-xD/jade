@@ -15,6 +15,17 @@ typedef struct {
     JSObjectRef callback;
 } ServerRequest;
 
+// Structure to hold client socket data
+typedef struct {
+    uv_tcp_t* client;
+} ClientRequest;
+
+// Write Callback
+void on_client_write(uv_write_t* req, int status) {
+    free(req->data);
+    free(req);
+}
+
 // Destructor for the server object
 void server_finalize(JSObjectRef object) {
     ServerRequest* sr = (ServerRequest*)JSObjectGetPrivate(object);
@@ -34,13 +45,29 @@ void on_new_connection(uv_stream_t* server, int status) {
     uv_tcp_t* client = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
     uv_tcp_init(uv_default_loop(), client);
     if (uv_accept(server, (uv_stream_t*)client) == 0) {
+        // Create ClientRequest struct
+        ClientRequest* cr = (ClientRequest*)malloc(sizeof(ClientRequest));
+        cr->client = client;
+
+        // Create a JavaScript client object
+        JSClassDefinition classDef = kJSClassDefinitionEmpty;
+        JSClassRef clientClass = JSClassCreate(&classDef);
+        JSObjectRef clientObject = JSObjectMake(sr->ctx, clientClass, cr);
+
+        // Attach `client.write(data)`
+        JSStringRef writeName = JSStringCreateWithUTF8CString("write");
+        JSObjectRef writeFunc = JSObjectMakeFunctionWithCallback(sr->ctx, writeName, client_write);
+        JSObjectSetProperty(sr->ctx, clientObject, writeName, writeFunc, kJSPropertyAttributeNone, NULL);
+        JSStringRelease(writeName);
+
         // Call JavaScript callback
-        JSValueRef args[] = { JSValueMakeNumber(sr->ctx, (uintptr_t)client) };
+        JSValueRef args[] = { clientObject };
         JSObjectCallAsFunction(sr->ctx, sr->callback, NULL, 1, args, NULL);
     } else {
         uv_close((uv_handle_t*)client, NULL);
     }
 }
+
 
 // `net.createServer(callback)`
 JSValueRef net_create_server(JSContextRef ctx, JSObjectRef function,
@@ -102,6 +129,42 @@ JSValueRef net_server_listen(JSContextRef ctx, JSObjectRef function,
     if (result < 0) {
         fprintf(stderr, "Server listen error: %s\n", uv_strerror(result));
     }
+
+    return JSValueMakeUndefined(ctx);
+}
+
+
+// `client.write(data)`
+JSValueRef client_write(JSContextRef ctx, JSObjectRef function,
+                        JSObjectRef thisObject, size_t argc,
+                        const JSValueRef args[], JSValueRef* exception) {
+    if (argc < 1 || !JSValueIsString(ctx, args[0])) {
+        JSStringRef errMsg = JSStringCreateWithUTF8CString("client.write requires a string argument");
+        *exception = JSValueMakeString(ctx, errMsg);
+        JSStringRelease(errMsg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Get the client object
+    ClientRequest* cr = (ClientRequest*)JSObjectGetPrivate(thisObject);
+    if (!cr || !cr->client) {
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Convert JS string to C string
+    JSStringRef jsData = JSValueToStringCopy(ctx, args[0], exception);
+    size_t dataLen = JSStringGetMaximumUTF8CStringSize(jsData);
+    char* data = (char*)malloc(dataLen);
+    JSStringGetUTF8CString(jsData, data, dataLen);
+    JSStringRelease(jsData);
+
+    // Prepare write request
+    uv_write_t* writeReq = (uv_write_t*)malloc(sizeof(uv_write_t));
+    uv_buf_t buffer = uv_buf_init(data, strlen(data));
+    writeReq->data = data;
+
+    // Write to the client
+    uv_write(writeReq, (uv_stream_t*)cr->client, &buffer, 1, on_client_write);
 
     return JSValueMakeUndefined(ctx);
 }
