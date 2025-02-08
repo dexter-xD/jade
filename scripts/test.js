@@ -1,23 +1,8 @@
-fs.readFile("/home/dexter/projects/jade/scripts/test.txt", (err, data) => {
-    if (err) {
-        console.error("Error:", err);
-    } else {
-        console.log("File Contents:", data);
-    }
+console.log("Starting server...");
+
+const server = net.createServer((client) => {
+    console.log("New client connected:", client);
 });
 
-fs.writeFile("output.txt", "Hello from C runtime!", (err) => {
-    if (err) {
-        console.error("Write Error:", err);
-    } else {
-        console.log("File written successfully!");
-    }
-});
-
-fs.exists("/home/dexter/projects/jade/scripts/test.txt", (err, exists) => {
-    if (err) {
-        console.error("Error:", err);
-    } else {
-        console.log("File exists:", exists);
-    }
-});
+server.listen(8080);
+console.log("Server running on port 8080");

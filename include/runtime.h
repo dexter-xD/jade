@@ -139,6 +139,22 @@ JSValueRef fs_exists(JSContextRef ctx, JSObjectRef function,
 
 
 
+/**
+ * Creates a TCP server that listens for connections.
+ */
+JSValueRef net_create_server(JSContextRef ctx, JSObjectRef function,
+                             JSObjectRef thisObject, size_t argc,
+                             const JSValueRef args[], JSValueRef* exception);
+
+/**
+ * Binds and starts the TCP server on a specified port.
+ */
+JSValueRef net_server_listen(JSContextRef ctx, JSObjectRef function,
+                             JSObjectRef thisObject, size_t argc,
+                             const JSValueRef args[], JSValueRef* exception);
+
+
+
 
 // =====================================================================================
 //                          SYSTEM API INTERFACE

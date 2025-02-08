@@ -394,4 +394,23 @@ void bind_js_native_apis(JSGlobalContextRef ctx) {
     JSObjectRef existsFunc = JSObjectMakeFunctionWithCallback(ctx, existsName, fs_exists);
     JSObjectSetProperty(ctx, fs, existsName, existsFunc, kJSPropertyAttributeNone, NULL);
     JSStringRelease(existsName);
+
+    // Create `net` object
+    JSObjectRef net = JSObjectMake(ctx, NULL, NULL);
+    JSStringRef netName = JSStringCreateWithUTF8CString("net");
+    JSObjectSetProperty(ctx, global, netName, net, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(netName);
+
+    // Add `net.createServer`
+    JSStringRef createServerName = JSStringCreateWithUTF8CString("createServer");
+    JSObjectRef createServerFunc = JSObjectMakeFunctionWithCallback(ctx, createServerName, net_create_server);
+    JSObjectSetProperty(ctx, net, createServerName, createServerFunc, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(createServerName);
+
+    // Add `server.listen`
+    JSStringRef listenName = JSStringCreateWithUTF8CString("listen");
+    JSObjectRef listenFunc = JSObjectMakeFunctionWithCallback(ctx, listenName, net_server_listen);
+    JSObjectSetProperty(ctx, net, listenName, listenFunc, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(listenName);
+
 }
