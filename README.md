@@ -92,6 +92,15 @@ make
 - `setTimeout` implementation
 - Memory-safe value passing between JS/C
 - Build system with CMake
+- HTTP Client with support for:
+  - GET requests
+  - POST requests with form data and JSON
+  - PUT requests with form data and JSON
+  - DELETE requests
+  - Response parsing (status code, headers, body)
+  - Error handling
+  - Query parameters
+  - Custom headers
 
 ### In Progress
 - Proper error propagation JS ↔ C
@@ -107,21 +116,54 @@ make
 
 ### Example Script
 ```javascript
-// Basic functionality demo
-console.log("Jade Runtime Initialized");
+// HTTP Client Examples
 
-setTimeout(() => {
-  console.error("Async operation completed");
-}, 1000);
+// GET request
+http.get('http://httpbin.org/get', (err, response) => {
+    if (err) {
+        console.error('Error:', err);
+        return;
+    }
+    console.log('Status:', response.statusCode);
+    console.log('Headers:', response.headers);
+    console.log('Body:', response.body);
+});
 
-console.log("Main thread execution");
-```
+// POST request with form data
+http.post('http://httpbin.org/post', 'key1=value1&key2=value2', (err, response) => {
+    if (err) {
+        console.error('Error:', err);
+        return;
+    }
+    console.log('Response:', response.body);
+});
 
-**Expected Output**:
-```
-LOG: Jade Runtime Initialized
-LOG: Main thread execution
-ERROR: Async operation completed
+// POST request with JSON data
+http.post('http://httpbin.org/post', '{"name":"John","age":30}', (err, response) => {
+    if (err) {
+        console.error('Error:', err);
+        return;
+    }
+    console.log('Response:', response.body);
+});
+
+// PUT request
+http.put('http://httpbin.org/put', 'key1=value1&key2=value2', (err, response) => {
+    if (err) {
+        console.error('Error:', err);
+        return;
+    }
+    console.log('Response:', response.body);
+});
+
+// DELETE request
+http.delete('http://httpbin.org/delete', (err, response) => {
+    if (err) {
+        console.error('Error:', err);
+        return;
+    }
+    console.log('Response:', response.body);
+});
 ```
 
 ### Current Limitations
@@ -129,6 +171,12 @@ ERROR: Async operation completed
 - Limited error handling
 - Single-file execution only
 - Basic memory management
+- No HTTPS support
+- No request timeout handling
+- No request retry mechanism
+- No request cancellation
+- No request streaming
+- No response streaming
 
 ## 🔬 Development Setup
 
@@ -160,6 +208,7 @@ make clean && make
 - [x] Basic JS execution context
 - [x] Event loop scaffolding
 - [x] Console API implementation
+- [x] HTTP Client implementation
 - [ ] File system API stubs
 
 ### Phase 2: Production Patterns
@@ -167,6 +216,11 @@ make clean && make
 - [ ] Memory management audits
 - [ ] Cross-platform testing
 - [ ] Benchmarking suite
+- [ ] HTTPS support
+- [ ] Request timeout handling
+- [ ] Request retry mechanism
+- [ ] Request cancellation
+- [ ] Request/response streaming
 
 ### Phase 3: Advanced Features
 - [ ] Promise integration
@@ -206,6 +260,8 @@ make clean && make
 | Memory leaks in timer callbacks | Manual cleanup in tests | High |
 | No Windows support | Use WSL/Linux VM | Medium |
 | Limited error messages | Check debug build output | Low |
+| No HTTPS support | Use HTTP only | Medium |
+| No request timeout | Implement in application | Low |
 
 ## 📚 Learning Resources
 

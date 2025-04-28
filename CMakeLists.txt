@@ -27,3 +27,8 @@ target_link_libraries(jade
     ${WEBKIT_LIBRARIES}
     ${LIBUV_LIBRARIES}
 )
+
+# Linux specific configuration
+if(NOT APPLE)
+    pkg_check_modules(WEBKIT REQUIRED webkit2gtk-4.0)
+endif()

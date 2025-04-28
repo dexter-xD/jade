@@ -169,6 +169,27 @@ JSValueRef http_get(JSContextRef ctx, JSObjectRef function,
                     const JSValueRef args[], JSValueRef* exception); 
 
 /**
+ * Performs an HTTP POST request to the specified URL.
+ */
+JSValueRef http_post(JSContextRef ctx, JSObjectRef function,
+                    JSObjectRef thisObject, size_t argc,
+                    const JSValueRef args[], JSValueRef* exception);
+
+/**
+ * Performs an HTTP PUT request to the specified URL.
+ */
+JSValueRef http_put(JSContextRef ctx, JSObjectRef function,
+                   JSObjectRef thisObject, size_t argc,
+                   const JSValueRef args[], JSValueRef* exception);
+
+/**
+ * Performs an HTTP DELETE request to the specified URL.
+ */
+JSValueRef http_delete(JSContextRef ctx, JSObjectRef function,
+                      JSObjectRef thisObject, size_t argc,
+                      const JSValueRef args[], JSValueRef* exception);
+
+/**
  * Creates an HTTP server that listens on the given port.
  */
 JSValueRef http_create_server(JSContextRef ctx, JSObjectRef function,

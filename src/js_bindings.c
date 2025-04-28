@@ -282,165 +282,103 @@ static JSValueRef js_process_exit(JSContextRef ctx, JSObjectRef function,
  * @param ctx  Context to enhance
  */
 void bind_js_native_apis(JSGlobalContextRef ctx) {
+    // Create global object
     JSObjectRef global = JSContextGetGlobalObject(ctx);
 
-    // Create runtime object
-    JSObjectRef runtime = JSObjectMake(ctx, NULL, NULL);
-    JSStringRef runtime_name = JSStringCreateWithUTF8CString("runtime");
-    JSObjectSetProperty(ctx, global, runtime_name, runtime, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(runtime_name);
-
-    // Add version info
-    JSStringRef version_key = JSStringCreateWithUTF8CString("version");
-    JSStringRef version_val = JSStringCreateWithUTF8CString(RUNTIME_VERSION);
-    JSObjectSetProperty(ctx, runtime, version_key, JSValueMakeString(ctx, version_val), kJSPropertyAttributeNone, NULL);
-    JSStringRelease(version_key);
-    JSStringRelease(version_val);
-
-    // Add runtime name
-    JSStringRef name_key = JSStringCreateWithUTF8CString("name");
-    JSStringRef name_val = JSStringCreateWithUTF8CString(RUNTIME_NAME);
-    JSObjectSetProperty(ctx, runtime, name_key, JSValueMakeString(ctx, name_val), kJSPropertyAttributeNone, NULL);
-    JSStringRelease(name_key);
-    JSStringRelease(name_val);
-
-    // Create console object
+    // ================== Console API ================== //
     JSObjectRef console = JSObjectMake(ctx, NULL, NULL);
-    JSStringRef console_name = JSStringCreateWithUTF8CString("console");
-    JSObjectSetProperty(ctx, global, console_name, console, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(console_name);
+    JSStringRef consoleName = JSStringCreateWithUTF8CString("console");
+    JSObjectSetProperty(ctx, global, consoleName, console, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(consoleName);
 
     // Add console methods
-    const char* methods[] = { "log", "warn", "info", "debug", "error" };
-    JSValueRef (*functions[])(JSContextRef, JSObjectRef, JSObjectRef, size_t, const JSValueRef[], JSValueRef*) = {
-        console_log, console_warn, console_info, console_debug, console_error
-    };
+    JSStringRef logName = JSStringCreateWithUTF8CString("log");
+    JSObjectSetProperty(ctx, console, logName, JSObjectMakeFunctionWithCallback(ctx, logName, console_log), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(logName);
 
-    for (int i = 0; i < 5; i++) {
-        JSStringRef name = JSStringCreateWithUTF8CString(methods[i]);
-        JSObjectRef func = JSObjectMakeFunctionWithCallback(ctx, name, functions[i]);
-        JSObjectSetProperty(ctx, console, name, func, kJSPropertyAttributeNone, NULL);
-        JSStringRelease(name);
-    }
+    JSStringRef warnName = JSStringCreateWithUTF8CString("warn");
+    JSObjectSetProperty(ctx, console, warnName, JSObjectMakeFunctionWithCallback(ctx, warnName, console_warn), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(warnName);
 
-    // Add setTimeout
-    JSStringRef setTimeout_name = JSStringCreateWithUTF8CString("setTimeout");
-    JSObjectRef setTimeout_func = JSObjectMakeFunctionWithCallback(ctx, setTimeout_name, js_set_timeout);
-    JSObjectSetProperty(ctx, global, setTimeout_name, setTimeout_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(setTimeout_name);
+    JSStringRef infoName = JSStringCreateWithUTF8CString("info");
+    JSObjectSetProperty(ctx, console, infoName, JSObjectMakeFunctionWithCallback(ctx, infoName, console_info), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(infoName);
 
-    // Add clearTimeout
-    JSStringRef clear_timeout_name = JSStringCreateWithUTF8CString("clearTimeout");
-    JSObjectRef clear_timeout_func = JSObjectMakeFunctionWithCallback(ctx, clear_timeout_name, js_clear_timeout);
-    JSObjectSetProperty(ctx, global, clear_timeout_name, clear_timeout_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(clear_timeout_name);
+    JSStringRef debugName = JSStringCreateWithUTF8CString("debug");
+    JSObjectSetProperty(ctx, console, debugName, JSObjectMakeFunctionWithCallback(ctx, debugName, console_debug), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(debugName);
 
-    // Add setInterval
-    JSStringRef set_interval_name = JSStringCreateWithUTF8CString("setInterval");
-    JSObjectRef set_interval_func = JSObjectMakeFunctionWithCallback(ctx, set_interval_name, js_set_interval);
-    JSObjectSetProperty(ctx, global, set_interval_name, set_interval_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(set_interval_name);
+    JSStringRef errorName = JSStringCreateWithUTF8CString("error");
+    JSObjectSetProperty(ctx, console, errorName, JSObjectMakeFunctionWithCallback(ctx, errorName, console_error), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(errorName);
 
-    // Add clearInterval
-    JSStringRef clear_interval_name = JSStringCreateWithUTF8CString("clearInterval");
-    JSObjectRef clear_interval_func = JSObjectMakeFunctionWithCallback(ctx, clear_interval_name, js_clear_interval);
-    JSObjectSetProperty(ctx, global, clear_interval_name, clear_interval_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(clear_interval_name);
+    // ================== Timer API ================== //
+    JSStringRef setTimeoutName = JSStringCreateWithUTF8CString("setTimeout");
+    JSObjectSetProperty(ctx, global, setTimeoutName, JSObjectMakeFunctionWithCallback(ctx, setTimeoutName, js_set_timeout), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(setTimeoutName);
 
-    // Create process object
+    JSStringRef clearTimeoutName = JSStringCreateWithUTF8CString("clearTimeout");
+    JSObjectSetProperty(ctx, global, clearTimeoutName, JSObjectMakeFunctionWithCallback(ctx, clearTimeoutName, js_clear_timeout), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(clearTimeoutName);
+
+    JSStringRef setIntervalName = JSStringCreateWithUTF8CString("setInterval");
+    JSObjectSetProperty(ctx, global, setIntervalName, JSObjectMakeFunctionWithCallback(ctx, setIntervalName, js_set_interval), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(setIntervalName);
+
+    JSStringRef clearIntervalName = JSStringCreateWithUTF8CString("clearInterval");
+    JSObjectSetProperty(ctx, global, clearIntervalName, JSObjectMakeFunctionWithCallback(ctx, clearIntervalName, js_clear_interval), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(clearIntervalName);
+
+    // ================== Process API ================== //
     JSObjectRef process = JSObjectMake(ctx, NULL, NULL);
-    JSStringRef process_name = JSStringCreateWithUTF8CString("process");
-    JSObjectSetProperty(ctx, global, process_name, process, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(process_name);
+    JSStringRef processName = JSStringCreateWithUTF8CString("process");
+    JSObjectSetProperty(ctx, global, processName, process, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(processName);
 
     // Add process.argv
-    JSValueRef argv_values[process_argc];
+    JSObjectRef argv = JSObjectMakeArray(ctx, 0, NULL, NULL);
     for (int i = 0; i < process_argc; i++) {
         JSStringRef arg = JSStringCreateWithUTF8CString(process_argv[i]);
-        argv_values[i] = JSValueMakeString(ctx, arg);
+        JSObjectSetPropertyAtIndex(ctx, argv, i, JSValueMakeString(ctx, arg), NULL);
         JSStringRelease(arg);
     }
-    JSObjectRef argv_array = JSObjectMakeArray(ctx, process_argc, argv_values, NULL);
-    JSStringRef argv_name = JSStringCreateWithUTF8CString("argv");
-    JSObjectSetProperty(ctx, process, argv_name, argv_array, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(argv_name);
+    JSStringRef argvName = JSStringCreateWithUTF8CString("argv");
+    JSObjectSetProperty(ctx, process, argvName, argv, kJSPropertyAttributeNone, NULL);
+    JSStringRelease(argvName);
 
     // Add process.exit
-    JSStringRef exit_name = JSStringCreateWithUTF8CString("exit");
-    JSObjectRef exit_func = JSObjectMakeFunctionWithCallback(ctx, exit_name, js_process_exit);
-    JSObjectSetProperty(ctx, process, exit_name, exit_func, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(exit_name);
+    JSStringRef exitName = JSStringCreateWithUTF8CString("exit");
+    JSObjectSetProperty(ctx, process, exitName, JSObjectMakeFunctionWithCallback(ctx, exitName, js_process_exit), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(exitName);
 
-    // Create `fs` object
-    JSObjectRef fs = JSObjectMake(ctx, NULL, NULL);
-    JSStringRef fsName = JSStringCreateWithUTF8CString("fs");
-    JSObjectSetProperty(ctx, global, fsName, fs, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(fsName);
-
-    // Add `fs.readFile`
-    JSStringRef readFileName = JSStringCreateWithUTF8CString("readFile");
-    JSObjectRef readFileFunc = JSObjectMakeFunctionWithCallback(ctx, readFileName, fs_read_file);
-    JSObjectSetProperty(ctx, fs, readFileName, readFileFunc, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(readFileName);
-
-    // Add `fs.writeFile`
-    JSStringRef writeFileName = JSStringCreateWithUTF8CString("writeFile");
-    JSObjectRef writeFileFunc = JSObjectMakeFunctionWithCallback(ctx, writeFileName, fs_write_file);
-    JSObjectSetProperty(ctx, fs, writeFileName, writeFileFunc, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(writeFileName);
-
-    // Add `fs.exists`
-    JSStringRef existsName = JSStringCreateWithUTF8CString("exists");
-    JSObjectRef existsFunc = JSObjectMakeFunctionWithCallback(ctx, existsName, fs_exists);
-    JSObjectSetProperty(ctx, fs, existsName, existsFunc, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(existsName);
-
-    // Create `net` object
-    JSObjectRef net = JSObjectMake(ctx, NULL, NULL);
-    JSStringRef netName = JSStringCreateWithUTF8CString("net");
-    JSObjectSetProperty(ctx, global, netName, net, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(netName);
-
-    // Add `net.createServer`
-    JSStringRef netCreateServerName = JSStringCreateWithUTF8CString("createServer");
-    JSObjectRef netCreateServerFunc = JSObjectMakeFunctionWithCallback(ctx, netCreateServerName, net_create_server);
-    JSObjectSetProperty(ctx, net, netCreateServerName, netCreateServerFunc, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(netCreateServerName);
-
-    // Add `server.listen`
-    JSStringRef netListenName = JSStringCreateWithUTF8CString("listen");
-    JSObjectRef netListenFunc = JSObjectMakeFunctionWithCallback(ctx, netListenName, net_server_listen);
-    JSObjectSetProperty(ctx, net, netListenName, netListenFunc, kJSPropertyAttributeNone, NULL);
-    JSStringRelease(netListenName);
-
-
-    // === Create or Retrieve `http` Object ===
+    // ================== HTTP API ================== //
+    JSObjectRef http = JSObjectMake(ctx, NULL, NULL);
     JSStringRef httpName = JSStringCreateWithUTF8CString("http");
-    JSObjectRef http;
-    JSValueRef existingHttp = JSObjectGetProperty(ctx, global, httpName, NULL);
-
-    if (JSValueIsObject(ctx, existingHttp)) {
-        http = (JSObjectRef)existingHttp;  // Use existing object
-    } else {
-        http = JSObjectMake(ctx, NULL, NULL);  // Create new object
-        JSObjectSetProperty(ctx, global, httpName, http, kJSPropertyAttributeNone, NULL);
-    }
+    JSObjectSetProperty(ctx, global, httpName, http, kJSPropertyAttributeNone, NULL);
     JSStringRelease(httpName);
 
-    // === Add `http.get` only if not defined ===
+    // Add http.get
     JSStringRef getName = JSStringCreateWithUTF8CString("get");
-    if (!JSObjectHasProperty(ctx, http, getName)) {
-        JSObjectRef getFunc = JSObjectMakeFunctionWithCallback(ctx, getName, http_get);
-        JSObjectSetProperty(ctx, http, getName, getFunc, kJSPropertyAttributeNone, NULL);
-    }
+    JSObjectSetProperty(ctx, http, getName, JSObjectMakeFunctionWithCallback(ctx, getName, http_get), kJSPropertyAttributeNone, NULL);
     JSStringRelease(getName);
 
-    // === Add `http.createServer` only if not defined ===
-    JSStringRef createServerName = JSStringCreateWithUTF8CString("createServer");
-    if (!JSObjectHasProperty(ctx, http, createServerName)) {
-        JSObjectRef createServerFunc = JSObjectMakeFunctionWithCallback(ctx, createServerName, http_create_server);
-        JSObjectSetProperty(ctx, http, createServerName, createServerFunc, kJSPropertyAttributeNone, NULL);
-    }
-    JSStringRelease(createServerName);
+    // Add http.post
+    JSStringRef postName = JSStringCreateWithUTF8CString("post");
+    JSObjectSetProperty(ctx, http, postName, JSObjectMakeFunctionWithCallback(ctx, postName, http_post), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(postName);
 
+    // Add http.put
+    JSStringRef putName = JSStringCreateWithUTF8CString("put");
+    JSObjectSetProperty(ctx, http, putName, JSObjectMakeFunctionWithCallback(ctx, putName, http_put), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(putName);
+
+    // Add http.delete
+    JSStringRef deleteName = JSStringCreateWithUTF8CString("delete");
+    JSObjectSetProperty(ctx, http, deleteName, JSObjectMakeFunctionWithCallback(ctx, deleteName, http_delete), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(deleteName);
+
+    // Add http.createServer
+    JSStringRef createServerName = JSStringCreateWithUTF8CString("createServer");
+    JSObjectSetProperty(ctx, http, createServerName, JSObjectMakeFunctionWithCallback(ctx, createServerName, http_create_server), kJSPropertyAttributeNone, NULL);
+    JSStringRelease(createServerName);
 }

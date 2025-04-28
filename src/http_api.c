@@ -1,4 +1,5 @@
 #include <JavaScriptCore/JavaScript.h>
+#include <JavaScriptCore/JSObjectRef.h>
 #include <uv.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,33 +17,31 @@ typedef struct {
     char* response_data;
     size_t response_size;
     size_t response_len;
+    int status_code;
+    char* response_headers;
+    size_t headers_size;
+    size_t headers_len;
+    bool headers_parsed;
+    char* response_body;
+    size_t body_size;
+    size_t body_len;
+    char* request_data;    // Added for POST data
+    size_t request_data_len; // Added for POST data length
+    const char* method;  // Added for HTTP method
 } HttpRequest;
 
-// Read Callback
-void on_http_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) {
-    HttpRequest* req = (HttpRequest*)stream->data;
+// Forward declarations
+void on_write_complete(uv_write_t* req, int status);
+void on_http_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+void on_http_connect(uv_connect_t* req, int status);
+void on_dns_resolved(uv_getaddrinfo_t* resolver, int status, struct addrinfo* res);
+JSValueRef res_end(JSContextRef ctx, JSObjectRef function, JSObjectRef thisObject,
+                   size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception);
 
-    if (nread > 0) {
-        req->response_data = realloc(req->response_data, req->response_size + nread + 1);
-        memcpy(req->response_data + req->response_size, buf->base, nread);
-        req->response_size += nread;
-        req->response_data[req->response_size] = '\0';
-    } else {
-        // Call the JS callback with response
-        JSStringRef jsResponse = JSStringCreateWithUTF8CString(req->response_data);
-        JSValueRef args[] = { JSValueMakeNull(req->ctx), JSValueMakeString(req->ctx, jsResponse) };
-        JSObjectCallAsFunction(req->ctx, req->callback, NULL, 2, args, NULL);
-        JSStringRelease(jsResponse);
-
-        // Cleanup
-        uv_close((uv_handle_t*)&req->socket, NULL);
-        free(req->host);
-        free(req->path);
-        free(req->response_data);
-        free(req);
-    }
-
-    free(buf->base);
+// Write callback for uv_write
+void on_write_complete(uv_write_t* req, int status) {
+    free(req->data); // Free the buffer data
+    free(req);       // Free the write request
 }
 
 // Allocate Buffer
@@ -51,22 +50,177 @@ void on_http_alloc(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
     buf->len = suggested_size;
 }
 
-// Connect Callback
+// Read Callback
+void on_http_read(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) {
+    HttpRequest* req = (HttpRequest*)stream->data;
+
+    if (nread > 0) {
+        // Append to response data
+        req->response_data = realloc(req->response_data, req->response_size + nread + 1);
+        memcpy(req->response_data + req->response_size, buf->base, nread);
+        req->response_size += nread;
+        req->response_data[req->response_size] = '\0';
+
+        // Parse response if headers haven't been parsed yet
+        if (!req->headers_parsed) {
+            char* header_end = strstr(req->response_data, "\r\n\r\n");
+            if (header_end) {
+                // Calculate header length
+                size_t header_len = header_end - req->response_data;
+                
+                // Store headers
+                req->response_headers = malloc(header_len + 1);
+                memcpy(req->response_headers, req->response_data, header_len);
+                req->response_headers[header_len] = '\0';
+                req->headers_size = header_len;
+                req->headers_len = header_len;
+
+                // Parse status code
+                char* status_line = strtok(req->response_headers, "\r\n");
+                if (status_line) {
+                    sscanf(status_line, "HTTP/1.1 %d", &req->status_code);
+                }
+
+                // Store body
+                size_t body_start = header_len + 4; // Skip \r\n\r\n
+                size_t body_len = req->response_size - body_start;
+                if (body_len > 0) {  // Only allocate if there's a body
+                    req->response_body = malloc(body_len + 1);
+                    memcpy(req->response_body, req->response_data + body_start, body_len);
+                    req->response_body[body_len] = '\0';
+                    req->body_size = body_len;
+                    req->body_len = body_len;
+                } else {
+                    req->response_body = strdup("{}");  // Empty JSON object for empty body
+                    req->body_size = 2;
+                    req->body_len = 2;
+                }
+
+                req->headers_parsed = true;
+            }
+        }
+    } else {
+        // Create response object
+        JSObjectRef responseObj = JSObjectMake(req->ctx, NULL, NULL);
+        
+        // Add status code
+        JSStringRef statusName = JSStringCreateWithUTF8CString("statusCode");
+        JSObjectSetProperty(req->ctx, responseObj, statusName, 
+                           JSValueMakeNumber(req->ctx, req->status_code), 
+                           kJSPropertyAttributeNone, NULL);
+        JSStringRelease(statusName);
+
+        // Add headers
+        JSObjectRef headersObj = JSObjectMake(req->ctx, NULL, NULL);
+        if (req->response_headers) {
+            char* header_line = strtok(req->response_headers, "\r\n");
+            while (header_line) {
+                char* colon = strchr(header_line, ':');
+                if (colon) {
+                    *colon = '\0';
+                    char* value = colon + 1;
+                    while (*value == ' ') value++; // Skip leading spaces
+
+                    JSStringRef headerName = JSStringCreateWithUTF8CString(header_line);
+                    JSStringRef headerValue = JSStringCreateWithUTF8CString(value);
+                    JSObjectSetProperty(req->ctx, headersObj, headerName,
+                                      JSValueMakeString(req->ctx, headerValue),
+                                      kJSPropertyAttributeNone, NULL);
+                    JSStringRelease(headerName);
+                    JSStringRelease(headerValue);
+                }
+                header_line = strtok(NULL, "\r\n");
+            }
+        }
+        JSStringRef headersName = JSStringCreateWithUTF8CString("headers");
+        JSObjectSetProperty(req->ctx, responseObj, headersName,
+                           JSValueToObject(req->ctx, headersObj, NULL),
+                           kJSPropertyAttributeNone, NULL);
+        JSStringRelease(headersName);
+
+        // Add body
+        JSStringRef bodyName = JSStringCreateWithUTF8CString("body");
+        JSStringRef bodyValue = JSStringCreateWithUTF8CString(req->response_body ? req->response_body : "{}");
+        JSObjectSetProperty(req->ctx, responseObj, bodyName,
+                           JSValueMakeString(req->ctx, bodyValue),
+                           kJSPropertyAttributeNone, NULL);
+        JSStringRelease(bodyName);
+        JSStringRelease(bodyValue);
+
+        // Call the JS callback with response
+        JSValueRef args[] = { JSValueMakeNull(req->ctx), JSValueToObject(req->ctx, responseObj, NULL) };
+        JSObjectCallAsFunction(req->ctx, req->callback, NULL, 2, args, NULL);
+
+        // Cleanup
+        uv_close((uv_handle_t*)&req->socket, NULL);
+        free(req->host);
+        free(req->path);
+        free(req->response_data);
+        free(req->response_headers);
+        free(req->response_body);
+        free(req);
+    }
+
+    free(buf->base);
+}
+
+// Helper function to check if data is JSON
+static bool is_json_data(const char* data) {
+    if (!data) return false;
+    // Simple check: starts with { and ends with }
+    return data[0] == '{' && data[strlen(data) - 1] == '}';
+}
+
+// Modify the connect callback to handle different content types
 void on_http_connect(uv_connect_t* req, int status) {
     if (status < 0) return;
 
     HttpRequest* http = (HttpRequest*)req->data;
     char request[1024];
-    snprintf(request, sizeof(request),
-        "GET %s HTTP/1.1\r\n"
-        "Host: %s\r\n"
-        "Connection: close\r\n\r\n",
-        http->path, http->host);
+    
+    // Check the HTTP method
+    if (http->method && strcmp(http->method, "DELETE") == 0) {
+        snprintf(request, sizeof(request),
+            "DELETE %s HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "Connection: close\r\n\r\n",
+            http->path, http->host);
+    } else if (http->method && strcmp(http->method, "PUT") == 0) {
+        const char* content_type = is_json_data(http->request_data) ? 
+            "application/json" : "application/x-www-form-urlencoded";
+            
+        snprintf(request, sizeof(request),
+            "PUT %s HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "Content-Type: %s\r\n"
+            "Content-Length: %zu\r\n"
+            "Connection: close\r\n\r\n"
+            "%s",
+            http->path, http->host, content_type, http->request_data_len, http->request_data);
+    } else if (http->request_data) {
+        const char* content_type = is_json_data(http->request_data) ? 
+            "application/json" : "application/x-www-form-urlencoded";
+            
+        snprintf(request, sizeof(request),
+            "POST %s HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "Content-Type: %s\r\n"
+            "Content-Length: %zu\r\n"
+            "Connection: close\r\n\r\n"
+            "%s",
+            http->path, http->host, content_type, http->request_data_len, http->request_data);
+    } else {
+        snprintf(request, sizeof(request),
+            "GET %s HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "Connection: close\r\n\r\n",
+            http->path, http->host);
+    }
 
     uv_buf_t write_buf = uv_buf_init(strdup(request), strlen(request));
     uv_write_t* write_req = malloc(sizeof(uv_write_t));
     write_req->data = write_buf.base;
-    uv_write(write_req, req->handle, &write_buf, 1, free);
+    uv_write(write_req, req->handle, &write_buf, 1, on_write_complete);
     uv_read_start(req->handle, on_http_alloc, on_http_read);
 }
 
@@ -76,7 +230,6 @@ void on_dns_resolved(uv_getaddrinfo_t* resolver, int status, struct addrinfo* re
     free(resolver);
 
     if (status < 0) {
-        // Handle error
         return;
     }
 
@@ -122,6 +275,212 @@ JSValueRef http_get(JSContextRef ctx, JSObjectRef function,
     http->path = path;
     http->response_data = NULL;
     http->response_size = 0;
+    http->response_len = 0;
+    http->status_code = 0;
+    http->response_headers = NULL;
+    http->headers_size = 0;
+    http->headers_len = 0;
+    http->headers_parsed = false;
+    http->response_body = NULL;
+    http->body_size = 0;
+    http->body_len = 0;
+    http->request_data = NULL;
+    http->request_data_len = 0;
+    http->method = NULL;  // Set the HTTP method to NULL
+
+    struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM };
+    uv_getaddrinfo_t* resolver = malloc(sizeof(uv_getaddrinfo_t));
+    resolver->data = http;
+    uv_getaddrinfo(uv_default_loop(), resolver, on_dns_resolved, http->host, "80", &hints);
+
+    free(url);
+    return JSValueMakeUndefined(ctx);
+}
+
+// `http.post(url, data, callback)`
+JSValueRef http_post(JSContextRef ctx, JSObjectRef function,
+                    JSObjectRef thisObject, size_t argc,
+                    const JSValueRef args[], JSValueRef* exception) {
+    if (argc < 3) {
+        JSStringRef msg = JSStringCreateWithUTF8CString("http.post requires 3 arguments: url, data, and callback");
+        *exception = JSValueMakeString(ctx, msg);
+        JSStringRelease(msg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Parse URL
+    JSStringRef urlRef = JSValueToStringCopy(ctx, args[0], exception);
+    size_t urlLen = JSStringGetMaximumUTF8CStringSize(urlRef);
+    char* url = malloc(urlLen);
+    JSStringGetUTF8CString(urlRef, url, urlLen);
+    JSStringRelease(urlRef);
+
+    // Ensure HTTP scheme
+    if (strncmp(url, "http://", 7) != 0) {
+        free(url);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Parse host and path
+    char* host_start = url + 7;
+    char* path_start = strchr(host_start, '/');
+    char* host = path_start ? strndup(host_start, path_start - host_start) : strdup(host_start);
+    char* path = path_start ? strdup(path_start) : strdup("/");
+
+    // Parse data
+    JSStringRef dataRef = JSValueToStringCopy(ctx, args[1], exception);
+    size_t dataLen = JSStringGetMaximumUTF8CStringSize(dataRef);
+    char* data = malloc(dataLen);
+    JSStringGetUTF8CString(dataRef, data, dataLen);
+    JSStringRelease(dataRef);
+
+    // Setup HTTP request
+    HttpRequest* http = malloc(sizeof(HttpRequest));
+    http->ctx = ctx;
+    http->callback = (JSObjectRef)args[2];
+    http->host = host;
+    http->path = path;
+    http->response_data = NULL;
+    http->response_size = 0;
+    http->response_len = 0;
+    http->status_code = 0;
+    http->response_headers = NULL;
+    http->headers_size = 0;
+    http->headers_len = 0;
+    http->headers_parsed = false;
+    http->response_body = NULL;
+    http->body_size = 0;
+    http->body_len = 0;
+    http->request_data = data;
+    http->request_data_len = strlen(data);
+    http->method = "POST";  // Set the HTTP method
+
+    struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM };
+    uv_getaddrinfo_t* resolver = malloc(sizeof(uv_getaddrinfo_t));
+    resolver->data = http;
+    uv_getaddrinfo(uv_default_loop(), resolver, on_dns_resolved, http->host, "80", &hints);
+
+    free(url);
+    return JSValueMakeUndefined(ctx);
+}
+
+// `http.put(url, data, callback)`
+JSValueRef http_put(JSContextRef ctx, JSObjectRef function,
+                   JSObjectRef thisObject, size_t argc,
+                   const JSValueRef args[], JSValueRef* exception) {
+    if (argc < 3) {
+        JSStringRef msg = JSStringCreateWithUTF8CString("http.put requires 3 arguments: url, data, and callback");
+        *exception = JSValueMakeString(ctx, msg);
+        JSStringRelease(msg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Parse URL
+    JSStringRef urlRef = JSValueToStringCopy(ctx, args[0], exception);
+    size_t urlLen = JSStringGetMaximumUTF8CStringSize(urlRef);
+    char* url = malloc(urlLen);
+    JSStringGetUTF8CString(urlRef, url, urlLen);
+    JSStringRelease(urlRef);
+
+    // Ensure HTTP scheme
+    if (strncmp(url, "http://", 7) != 0) {
+        free(url);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Parse host and path
+    char* host_start = url + 7;
+    char* path_start = strchr(host_start, '/');
+    char* host = path_start ? strndup(host_start, path_start - host_start) : strdup(host_start);
+    char* path = path_start ? strdup(path_start) : strdup("/");
+
+    // Parse data
+    JSStringRef dataRef = JSValueToStringCopy(ctx, args[1], exception);
+    size_t dataLen = JSStringGetMaximumUTF8CStringSize(dataRef);
+    char* data = malloc(dataLen);
+    JSStringGetUTF8CString(dataRef, data, dataLen);
+    JSStringRelease(dataRef);
+
+    // Setup HTTP request
+    HttpRequest* http = malloc(sizeof(HttpRequest));
+    http->ctx = ctx;
+    http->callback = (JSObjectRef)args[2];
+    http->host = host;
+    http->path = path;
+    http->response_data = NULL;
+    http->response_size = 0;
+    http->response_len = 0;
+    http->status_code = 0;
+    http->response_headers = NULL;
+    http->headers_size = 0;
+    http->headers_len = 0;
+    http->headers_parsed = false;
+    http->response_body = NULL;
+    http->body_size = 0;
+    http->body_len = 0;
+    http->request_data = data;
+    http->request_data_len = strlen(data);
+    http->method = "PUT";  // Set the HTTP method
+
+    struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM };
+    uv_getaddrinfo_t* resolver = malloc(sizeof(uv_getaddrinfo_t));
+    resolver->data = http;
+    uv_getaddrinfo(uv_default_loop(), resolver, on_dns_resolved, http->host, "80", &hints);
+
+    free(url);
+    return JSValueMakeUndefined(ctx);
+}
+
+// `http.delete(url, callback)`
+JSValueRef http_delete(JSContextRef ctx, JSObjectRef function,
+                      JSObjectRef thisObject, size_t argc,
+                      const JSValueRef args[], JSValueRef* exception) {
+    if (argc < 2) {
+        JSStringRef msg = JSStringCreateWithUTF8CString("http.delete requires 2 arguments: url and callback");
+        *exception = JSValueMakeString(ctx, msg);
+        JSStringRelease(msg);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Parse URL
+    JSStringRef urlRef = JSValueToStringCopy(ctx, args[0], exception);
+    size_t urlLen = JSStringGetMaximumUTF8CStringSize(urlRef);
+    char* url = malloc(urlLen);
+    JSStringGetUTF8CString(urlRef, url, urlLen);
+    JSStringRelease(urlRef);
+
+    // Ensure HTTP scheme
+    if (strncmp(url, "http://", 7) != 0) {
+        free(url);
+        return JSValueMakeUndefined(ctx);
+    }
+
+    // Parse host and path
+    char* host_start = url + 7;
+    char* path_start = strchr(host_start, '/');
+    char* host = path_start ? strndup(host_start, path_start - host_start) : strdup(host_start);
+    char* path = path_start ? strdup(path_start) : strdup("/");
+
+    // Setup HTTP request
+    HttpRequest* http = malloc(sizeof(HttpRequest));
+    http->ctx = ctx;
+    http->callback = (JSObjectRef)args[1];
+    http->host = host;
+    http->path = path;
+    http->response_data = NULL;
+    http->response_size = 0;
+    http->response_len = 0;
+    http->status_code = 0;
+    http->response_headers = NULL;
+    http->headers_size = 0;
+    http->headers_len = 0;
+    http->headers_parsed = false;
+    http->response_body = NULL;
+    http->body_size = 0;
+    http->body_len = 0;
+    http->request_data = NULL;
+    http->request_data_len = 0;
+    http->method = "DELETE";  // Set the HTTP method
 
     struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM };
     uv_getaddrinfo_t* resolver = malloc(sizeof(uv_getaddrinfo_t));
@@ -155,12 +514,6 @@ static void server_finalize(JSObjectRef object) {
         uv_close((uv_handle_t*)&server->server, NULL);
         free(server);
     }
-}
-
-// Write callback for uv_write
-void on_write_complete(uv_write_t* req, int status) {
-    free(req->data); // Free the buffer data
-    free(req);       // Free the write request
 }
 
 // Response "end" method implementation
@@ -222,9 +575,6 @@ void on_client_read(uv_stream_t* client, ssize_t nread, const uv_buf_t* buf) {
 
     free(buf->base);
 }
-
-
-
 
 // Handle new HTTP connections
 void on_new_http_connection(uv_stream_t* server, int status) {
